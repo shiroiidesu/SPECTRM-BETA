@@ -1,0 +1,14 @@
+# Build output (rebuilt from source; the big exes don't belong in git)
+bin/
+obj/
+publish/
+dist/
+
+# Editor / IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Local backups
+*.bak

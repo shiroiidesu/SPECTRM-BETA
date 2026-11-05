@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    SPECTRM installer. Targets .NET Framework 4.8, which every Windows 10/11 PC already has, so the setup
+    program itself is tiny. tools\build-installer.ps1 appends the compressed SPECTRM.exe to the end of this exe,
+    producing one self-contained dist\SPECTRM-Setup-<version>.exe. The same exe, without the appended app,
+    is copied into the install folder as "Uninstall SPECTRM.exe".
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>SPECTRM-Setup</AssemblyName>
+    <RootNamespace>Spectrm.Setup</RootNamespace>
+    <ApplicationIcon>..\SPECTRM.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <DebugType>none</DebugType>
+    <Product>SPECTRM</Product>
+    <AssemblyTitle>SPECTRM Setup</AssemblyTitle>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.IO.Compression" />
+    <Compile Include="..\Logo.cs" Link="Logo.cs" />
+    <Compile Include="..\LogoData.cs" Link="LogoData.cs" />
+    <EmbeddedResource Include="..\SPECTRM.ico" LogicalName="SPECTRM.ico" />
+  </ItemGroup>
+</Project>
