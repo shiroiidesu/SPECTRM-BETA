@@ -1,7 +1,5 @@
 # SPECTRM
 
-SPECTRM is a audio Metering tool for music production purposes!
-
 SPECTRM is a native Windows desktop real-time audio meter built with .NET Windows Forms. It does not use a browser or a web view.
 
 ## Run
