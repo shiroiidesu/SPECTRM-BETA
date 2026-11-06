@@ -10,8 +10,9 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
+    <!-- Only the few native DLLs get unpacked (to %TEMP%\.net); the .NET assemblies load straight from the exe.
+         IncludeAllContentForSelfExtract used to unpack all ~140 MB on every new build and filled up C:. -->
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
     <ApplicationIcon>SPECTRM.ico</ApplicationIcon>
     <Version>1.0.0</Version>
     <Product>SPECTRM</Product>

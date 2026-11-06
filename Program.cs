@@ -41,21 +41,105 @@ internal static class UiFonts
     public const TextRenderingHint Rendering = TextRenderingHint.ClearTypeGridFit;
 }
 
-/// <summary>SPECTRM colour palette: mint primary, violet secondary, hot-pink highlight on teal-tinted black.</summary>
+/// <summary>
+/// One colour theme: three accent colours (primary, secondary, warning/"over"), tinted greys for text and
+/// surfaces, and the spectrogram's colour ramp (quiet to loud). Backgrounds stay black in every theme.
+/// </summary>
+internal sealed class ColorTheme
+{
+    public required string Id { get; init; }
+    public required string Name { get; init; }
+    public required Color Accent { get; init; }
+    public required Color Secondary { get; init; }
+    public required Color Highlight { get; init; }
+    public required Color Ink { get; init; }
+    public required Color Label { get; init; }
+    public required Color Grid { get; init; }
+    public required Color Track { get; init; }
+    public required Color Box { get; init; }
+    public required Color Line { get; init; }
+    public required Color Hover { get; init; }
+    public required Color[] Spectrogram { get; init; }
+
+    private static Color C(int r, int g, int b) => Color.FromArgb(r, g, b);
+
+    /// <summary>Theme whose greys are tinted by (r, g, b) multipliers in 0..1.</summary>
+    private static ColorTheme Tinted(string id, string name, Color accent, Color secondary, Color highlight,
+        double r, double g, double b, params Color[] spectrogram)
+    {
+        Color Grey(double level) => C((int)(level * r), (int)(level * g), (int)(level * b));
+        Color InkTint() => C((int)(240 * (1 - (1 - r) * 0.2)), (int)(240 * (1 - (1 - g) * 0.2)), (int)(240 * (1 - (1 - b) * 0.2)));
+        return new ColorTheme
+        {
+            Id = id, Name = name, Accent = accent, Secondary = secondary, Highlight = highlight,
+            Ink = InkTint(), Label = Grey(138), Grid = Grey(33), Track = Grey(22), Box = Grey(38), Line = Grey(47), Hover = Grey(36),
+            Spectrogram = spectrogram,
+        };
+    }
+
+    public static readonly ColorTheme[] All =
+    {
+        new()
+        {
+            Id = "deepsea", Name = "Deep Sea",
+            Accent = C(112, 240, 200), Secondary = C(150, 132, 255), Highlight = C(255, 84, 140),
+            Ink = C(228, 240, 236), Label = C(108, 136, 132), Grid = C(17, 33, 31), Track = C(10, 22, 21),
+            Box = C(15, 38, 36), Line = C(26, 46, 44), Hover = C(18, 36, 34),
+            Spectrogram = new[]
+            {
+                C(0, 0, 0), C(4, 10, 26), C(10, 22, 60), C(20, 40, 104), C(30, 70, 150), C(28, 110, 170),
+                C(30, 155, 172), C(60, 200, 180), C(112, 240, 200), C(190, 252, 228), C(255, 255, 255),
+            },
+        },
+        Tinted("aurora", "Aurora", C(110, 245, 150), C(90, 200, 255), C(255, 96, 200), 0.80, 1.0, 0.86,
+            C(0, 0, 0), C(4, 16, 10), C(8, 34, 22), C(12, 60, 40), C(20, 96, 60), C(40, 140, 80),
+            C(70, 190, 110), C(120, 230, 140), C(170, 250, 190), C(220, 255, 235), C(255, 255, 255)),
+        Tinted("synthwave", "Synthwave", C(255, 96, 214), C(96, 220, 255), C(255, 214, 90), 0.92, 0.78, 1.0,
+            C(0, 0, 0), C(14, 4, 30), C(32, 8, 64), C(58, 14, 100), C(96, 20, 130), C(140, 30, 150),
+            C(190, 50, 170), C(235, 80, 190), C(255, 130, 210), C(255, 200, 235), C(255, 255, 255)),
+        Tinted("glacier", "Glacier", C(130, 205, 255), C(184, 168, 255), C(255, 96, 120), 0.80, 0.91, 1.0,
+            C(0, 0, 0), C(2, 8, 24), C(6, 18, 52), C(12, 34, 90), C(22, 56, 130), C(40, 90, 170),
+            C(70, 130, 205), C(110, 170, 235), C(160, 205, 250), C(210, 232, 255), C(255, 255, 255)),
+        Tinted("graphite", "Graphite", C(236, 236, 236), C(150, 150, 160), C(255, 72, 72), 1.0, 1.0, 1.0,
+            C(0, 0, 0), C(12, 12, 12), C(26, 26, 26), C(42, 42, 42), C(60, 60, 60), C(82, 82, 82),
+            C(108, 108, 108), C(138, 138, 138), C(170, 170, 170), C(212, 212, 212), C(255, 255, 255)),
+    };
+
+    public static ColorTheme ById(string? id) =>
+        All.FirstOrDefault(theme => string.Equals(theme.Id, id, StringComparison.OrdinalIgnoreCase)) ?? All[0];
+}
+
+/// <summary>
+/// The active SPECTRM colours. Everything reads them at paint time; <see cref="Changed"/> fires when the user
+/// picks another theme so cached pens, brushes and colour tables can be rebuilt.
+/// </summary>
 internal static class Palette
 {
-    public static readonly Color Accent = Color.FromArgb(112, 240, 200);    // mint
-    public static readonly Color Secondary = Color.FromArgb(150, 132, 255); // violet
-    public static readonly Color Highlight = Color.FromArgb(255, 84, 140);  // hot pink
-    public static readonly Color Needle = Accent;
-    public static readonly Color Over = Highlight;
-    public static readonly Color Ink = Color.FromArgb(228, 240, 236);
-    public static readonly Color Label = Color.FromArgb(108, 136, 132);
-    public static readonly Color Grid = Color.FromArgb(17, 33, 31);
-    public static readonly Color Track = Color.FromArgb(10, 22, 21);
-    public static readonly Color Box = Color.FromArgb(15, 38, 36);
-    public static readonly Color Line = Color.FromArgb(26, 46, 44);
-    public static readonly Color Hover = Color.FromArgb(18, 36, 34);
+    public static ColorTheme Theme { get; private set; } = ColorTheme.All[0];
+    public static event Action? Changed;
+
+    public static Color Accent => Theme.Accent;
+    public static Color Secondary => Theme.Secondary;
+    public static Color Highlight => Theme.Highlight;
+    public static Color Needle => Theme.Accent;
+    public static Color Over => Theme.Highlight;
+    public static Color Ink => Theme.Ink;
+    public static Color Label => Theme.Label;
+    public static Color Grid => Theme.Grid;
+    public static Color Track => Theme.Track;
+    public static Color Box => Theme.Box;
+    public static Color Line => Theme.Line;
+    public static Color Hover => Theme.Hover;
+
+    public static void Apply(ColorTheme theme)
+    {
+        if (ReferenceEquals(theme, Theme)) return;
+        Theme = theme;
+        Changed?.Invoke();
+    }
+
+    public static Color Mix(Color a, Color b, double amount) => Color.FromArgb(
+        (int)(a.R + (b.R - a.R) * amount), (int)(a.G + (b.G - a.G) * amount), (int)(a.B + (b.B - a.B) * amount));
 }
 
 internal sealed class LowLatencyLoopbackCapture : WasapiCapture
@@ -72,6 +156,259 @@ internal sealed class BufferedPanel : Panel
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
         UpdateStyles();
     }
+}
+
+internal enum BarGlyph { Layout, Pin, Options, Minimize, Maximize, Restore, Close }
+
+/// <summary>
+/// Top-bar button drawn entirely by SPECTRM: thin vector line icons in the palette's muted grey that brighten on
+/// hover, a soft rounded highlight that fades in, and an accent colour when switched on (pin).
+/// </summary>
+internal sealed class BarButton : Button
+{
+    private readonly System.Windows.Forms.Timer _fade = new() { Interval = 15 };
+    private float _hover;
+    private bool _over;
+    private bool _pressed;
+
+    public BarButton()
+    {
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+        FlatStyle = FlatStyle.Flat;
+        FlatAppearance.BorderSize = 0;
+        _fade.Tick += (_, _) =>
+        {
+            var target = _over ? 1f : 0f;
+            _hover += Math.Sign(target - _hover) * 0.16f;
+            if (Math.Abs(_hover - target) < 0.17f) { _hover = target; _fade.Stop(); }
+            Invalidate();
+        };
+    }
+
+    public BarGlyph Glyph { get; set; }
+
+    /// <summary>Window controls fill the whole cell on hover; tool buttons get a rounded pill.</summary>
+    public bool WindowControl { get; set; }
+
+    /// <summary>On-state (pin): the icon is drawn in the accent colour.</summary>
+    public bool Active { get => _active; set { _active = value; Invalidate(); } }
+    private bool _active;
+
+    /// <summary>For the layout icon: true when the window is currently vertical.</summary>
+    public bool Vertical { get => _vertical; set { _vertical = value; Invalidate(); } }
+    private bool _vertical;
+
+    protected override void OnMouseEnter(EventArgs e) { _over = true; _fade.Start(); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { _over = false; _pressed = false; _fade.Start(); base.OnMouseLeave(e); }
+    protected override void OnMouseDown(MouseEventArgs e) { _pressed = true; Invalidate(); base.OnMouseDown(e); }
+    protected override void OnMouseUp(MouseEventArgs e) { _pressed = false; Invalidate(); base.OnMouseUp(e); }
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) _fade.Dispose();
+        base.Dispose(disposing);
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.Clear(Color.Black);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+
+        var danger = Glyph == BarGlyph.Close;
+        if (_hover > 0)
+        {
+            var fill = danger ? Color.FromArgb(196, 43, 28) : _pressed ? Palette.Line : Palette.Hover;
+            using var brush = new SolidBrush(Color.FromArgb((int)(255 * _hover), fill));
+            if (WindowControl) g.FillRectangle(brush, ClientRectangle);
+            else
+            {
+                using var pill = Rounded(new RectangleF(3, 4, Width - 6, Height - 8), 6);
+                g.FillPath(brush, pill);
+            }
+        }
+        if (Focused && ShowFocusCues)
+        {
+            using var ring = new Pen(Palette.Accent);
+            using var pill = Rounded(new RectangleF(3.5f, 4.5f, Width - 7, Height - 9), 6);
+            g.DrawPath(ring, pill);
+        }
+
+        var rest = _active ? Palette.Accent : Palette.Mix(Palette.Label, Palette.Ink, 0.3);
+        var lit = _active ? Palette.Accent : danger ? Color.White : Palette.Ink;
+        var color = Palette.Mix(rest, lit, _hover);
+        using var pen = new Pen(color, 1.3f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
+        using var solid = new SolidBrush(color);
+        var cx = Width / 2f;
+        var cy = Height / 2f;
+        switch (Glyph)
+        {
+            case BarGlyph.Layout:
+            {
+                // The arrangement it switches to: a panel split into three, side by side or stacked.
+                var w = _vertical ? 14f : 9f;
+                var h = _vertical ? 9f : 14f;
+                using (var frame = Rounded(new RectangleF(cx - w / 2, cy - h / 2, w, h), 2)) g.DrawPath(pen, frame);
+                for (var i = 1; i < 3; i++)
+                {
+                    if (_vertical) { var x = cx - w / 2 + w * i / 3; g.DrawLine(pen, x, cy - h / 2 + 1.5f, x, cy + h / 2 - 1.5f); }
+                    else { var y = cy - h / 2 + h * i / 3; g.DrawLine(pen, cx - w / 2 + 1.5f, y, cx + w / 2 - 1.5f, y); }
+                }
+                break;
+            }
+            case BarGlyph.Pin:
+            {
+                // Always on top: a window sitting above another one; filled in when pinned.
+                using (var back = Rounded(new RectangleF(cx - 6, cy - 2, 9, 8), 2)) g.DrawPath(pen, back);
+                using var front = Rounded(new RectangleF(cx - 3, cy - 6, 9, 8), 2);
+                using (var clear = new SolidBrush(Color.Black)) g.FillPath(clear, front);
+                if (_hover > 0 && !WindowControl)
+                {
+                    using var under = new SolidBrush(Color.FromArgb((int)(255 * _hover), _pressed ? Palette.Line : Palette.Hover));
+                    g.FillPath(under, front);
+                }
+                if (_active) g.FillPath(solid, front); else g.DrawPath(pen, front);
+                break;
+            }
+            case BarGlyph.Options:
+            {
+                // Three faders, like a mixer strip.
+                var xs = new[] { cx - 5, cx, cx + 5 };
+                var knobs = new[] { cy + 2.5f, cy - 3f, cy + 0.5f };
+                for (var i = 0; i < 3; i++)
+                {
+                    g.DrawLine(pen, xs[i], cy - 6.5f, xs[i], cy + 6.5f);
+                    var knob = new RectangleF(xs[i] - 2.5f, knobs[i] - 1.5f, 5, 3);
+                    using var cap = Rounded(knob, 1.2f);
+                    g.FillPath(solid, cap);
+                }
+                break;
+            }
+            case BarGlyph.Minimize:
+                g.DrawLine(pen, cx - 5, cy, cx + 5, cy);
+                break;
+            case BarGlyph.Maximize:
+                using (var box = Rounded(new RectangleF(cx - 4.5f, cy - 4.5f, 9, 9), 1.5f)) g.DrawPath(pen, box);
+                break;
+            case BarGlyph.Restore:
+                using (var back = new GraphicsPath())
+                {
+                    back.AddLines(new[] { new PointF(cx - 2f, cy - 4.5f), new PointF(cx + 4.5f, cy - 4.5f), new PointF(cx + 4.5f, cy + 2f) });
+                    g.DrawPath(pen, back);
+                }
+                using (var box = Rounded(new RectangleF(cx - 4.5f, cy - 2f, 7, 7), 1.5f)) g.DrawPath(pen, box);
+                break;
+            case BarGlyph.Close:
+                g.DrawLine(pen, cx - 4.5f, cy - 4.5f, cx + 4.5f, cy + 4.5f);
+                g.DrawLine(pen, cx + 4.5f, cy - 4.5f, cx - 4.5f, cy + 4.5f);
+                break;
+        }
+    }
+
+    private static GraphicsPath Rounded(RectangleF r, float radius)
+    {
+        var path = new GraphicsPath();
+        var d = radius * 2;
+        path.AddArc(r.X, r.Y, d, d, 180, 90);
+        path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+        path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+        path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+        path.CloseFigure();
+        return path;
+    }
+}
+
+/// <summary>
+/// Drives the meters at the chosen frame rate. A WinForms timer can't: its WM_TIMER ticks are rounded to the
+/// 15.6 ms system tick (about 64 fps at best). This thread sleeps on a high-resolution waitable timer and posts
+/// one frame at a time to the UI thread, never queuing a new frame while the last one is still drawing.
+/// </summary>
+internal sealed class FrameClock : IDisposable
+{
+    private readonly Control _owner;
+    private readonly Action _frame;
+    private readonly Thread _thread;
+    private readonly IntPtr _waitTimer;
+    private volatile bool _running = true;
+    private volatile int _pending;
+    private volatile int _intervalMicroseconds = 16_667;
+
+    public FrameClock(Control owner, Action frame)
+    {
+        _owner = owner;
+        _frame = frame;
+        _waitTimer = CreateWaitableTimerExW(IntPtr.Zero, null, CreateWaitableTimerHighResolution, TimerAllAccess);
+        _thread = new Thread(Run) { IsBackground = true, Name = "SPECTRM frame clock", Priority = ThreadPriority.AboveNormal };
+    }
+
+    /// <summary>Frames per second; 0 = as fast as frames can be drawn.</summary>
+    public int FramesPerSecond { set => _intervalMicroseconds = value <= 0 ? 0 : 1_000_000 / value; }
+
+    public void Start() => _thread.Start();
+
+    private void Run()
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var next = 0.0;
+        while (_running)
+        {
+            var interval = _intervalMicroseconds / 1000.0;
+            var now = clock.Elapsed.TotalMilliseconds;
+            if (interval > 0)
+            {
+                next += interval;
+                if (next < now - interval) next = now + interval; // fell behind (busy PC, window dragged): don't burst
+                var wait = next - clock.Elapsed.TotalMilliseconds;
+                if (wait > 0) Sleep(wait);
+            }
+            else Sleep(1);
+            if (!_running) break;
+            if (Interlocked.CompareExchange(ref _pending, 1, 0) != 0) continue; // previous frame still drawing
+            try
+            {
+                if (!_owner.IsHandleCreated || _owner.IsDisposed) { _pending = 0; continue; }
+                _owner.BeginInvoke(() =>
+                {
+                    try { _frame(); }
+                    finally { _pending = 0; }
+                });
+            }
+            catch (InvalidOperationException) { _pending = 0; }
+        }
+    }
+
+    private void Sleep(double milliseconds)
+    {
+        if (_waitTimer == IntPtr.Zero) { Thread.Sleep(Math.Max(1, (int)milliseconds)); return; }
+        var due = -(long)(milliseconds * 10_000); // relative, in 100 ns units
+        if (SetWaitableTimer(_waitTimer, ref due, 0, IntPtr.Zero, IntPtr.Zero, false))
+            WaitForSingleObject(_waitTimer, 1000);
+    }
+
+    public void Dispose()
+    {
+        _running = false;
+        if (_thread.IsAlive) _thread.Join(200);
+        if (_waitTimer != IntPtr.Zero) CloseHandle(_waitTimer);
+    }
+
+    private const uint CreateWaitableTimerHighResolution = 0x00000002;
+    private const uint TimerAllAccess = 0x1F0003;
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr CreateWaitableTimerExW(IntPtr attributes, string? name, uint flags, uint access);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetWaitableTimer(IntPtr timer, ref long dueTime, int period, IntPtr completion, IntPtr arg, bool resume);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool CloseHandle(IntPtr handle);
 }
 
 internal sealed class BufferedTableLayoutPanel : TableLayoutPanel
@@ -133,25 +470,19 @@ internal sealed class MeterWindow : Form
     private const int HtBottomRight = 17;
 
     private static readonly Color Background = Color.Black;
-    private static readonly Color Surface = Color.FromArgb(14, 14, 17);
-    private static readonly Color Border = Color.FromArgb(39, 38, 45);
-    private static readonly Color Ink = Palette.Ink;
-    private static readonly Color Muted = Palette.Label;
-    private static readonly Color Purple = Color.FromArgb(174, 143, 226);
-    private static readonly Color Mint = Color.FromArgb(207, 190, 239);
-    private static readonly Color Orange = Color.FromArgb(174, 143, 226);
-    private static readonly Color Blue = Color.FromArgb(224, 219, 232);
+    private static Color Ink => Palette.Ink;
+    private static Color Muted => Palette.Label;
 
     private readonly AnalysisEngine _analysis = new();
     private readonly Label _status = new();
     private readonly List<MeterChart> _charts = new();
-    private readonly System.Windows.Forms.Timer _timer = new() { Interval = 16 };
+    private FrameClock? _frameClock;
     private readonly System.Windows.Forms.Timer _deviceTimer = new() { Interval = 1500 };
     private readonly System.Windows.Forms.Timer _topBarTimer = new() { Interval = 30 };
     private readonly BufferedPanel _topBar = new();
-    private readonly Button _settingsButton = new();
-    private readonly Button _pinButton = new();
-    private readonly Button _layoutButton = new();
+    private readonly BarButton _settingsButton = new();
+    private readonly BarButton _pinButton = new();
+    private readonly BarButton _layoutButton = new();
     private BufferedTableLayoutPanel? _chartGrid;
     private bool _vertical;
     private bool _pinned;
@@ -159,9 +490,9 @@ internal sealed class MeterWindow : Form
     private Size? _verticalSize;
     private static readonly Size HorizontalMinimum = new(900, 100);
     private static readonly Size VerticalMinimum = new(320, 640);
-    private readonly Button _minimizeButton = new();
-    private readonly Button _maximizeButton = new();
-    private readonly Button _closeButton = new();
+    private readonly BarButton _minimizeButton = new();
+    private readonly BarButton _maximizeButton = new();
+    private readonly BarButton _closeButton = new();
     private readonly ToolTip _statusTooltip = new();
     private AnalysisSnapshot _snapshot = new();
     private int _targetFps;
@@ -194,6 +525,7 @@ internal sealed class MeterWindow : Form
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
         LoadSettings();
+        Palette.Apply(_theme); // before any control is built, so everything starts in the saved theme
         MinimumSize = _vertical ? VerticalMinimum : HorizontalMinimum;
         Size = _vertical ? DefaultVerticalSize() : DefaultHorizontalSize();
         BackColor = Background;
@@ -208,10 +540,14 @@ internal sealed class MeterWindow : Form
         UpdatePinButton();
         UpdateLayoutButton();
         _settingsOverlay.Pinned = _pinned;
-        _timer.Tick += (_, _) => RefreshMeters();
+        _settingsOverlay.CurrentTheme = Array.IndexOf(ColorTheme.All, _theme);
+        Palette.Changed += ApplyThemeColors;
+        FormClosed += (_, _) => Palette.Changed -= ApplyThemeColors;
         _deviceTimer.Tick += (_, _) => FollowDefaultOutput();
         _topBarTimer.Tick += (_, _) => UpdateTopBarVisibility();
-        _timer.Start();
+        _frameClock = new FrameClock(this, RenderFrame);
+        ConfigureFrameRate();
+        HandleCreated += (_, _) => _frameClock.Start();
         _deviceTimer.Start();
         _topBarTimer.Start();
         FormClosing += (_, _) => DisposeAudio();
@@ -294,35 +630,31 @@ internal sealed class MeterWindow : Form
         _status.Cursor = Cursors.SizeAll;
 
         // Tool buttons: layout toggle, pin (always on top), options cog.
-        ConfigureWindowButton(_settingsButton, "", "Options (Alt+S)");
+        ConfigureWindowButton(_settingsButton, BarGlyph.Options, "Options (Alt+S)");
         _settingsButton.AccessibleDescription = "Opens options: frame rate, layout and always on top. Keyboard shortcut Alt+S.";
         _settingsButton.Click += (_, _) => OpenSettings();
 
-        ConfigureWindowButton(_pinButton, "", "Pin: always stay on top (Alt+P)");
+        ConfigureWindowButton(_pinButton, BarGlyph.Pin, "Pin: always stay on top (Alt+P)");
         _pinButton.Click += (_, _) => SetPinned(!_pinned);
 
-        ConfigureWindowButton(_layoutButton, "", "Switch layout (Alt+L)");
-        _layoutButton.Paint += (_, e) => PaintLayoutIcon(e.Graphics);
+        ConfigureWindowButton(_layoutButton, BarGlyph.Layout, "Switch layout (Alt+L)");
         _layoutButton.Click += (_, _) => SetVertical(!_vertical);
 
         foreach (var button in new[] { _layoutButton, _pinButton, _settingsButton })
         {
-            button.Size = new Size(34, TopBarHeight);
+            button.Size = new Size(32, TopBarHeight);
             button.Top = 0;
-            button.Font = new Font("Segoe MDL2 Assets", 9F);
         }
 
-        ConfigureWindowButton(_minimizeButton, "", "Minimize");
-        ConfigureWindowButton(_maximizeButton, "", "Maximize");
-        ConfigureWindowButton(_closeButton, "", "Close");
+        ConfigureWindowButton(_minimizeButton, BarGlyph.Minimize, "Minimize");
+        ConfigureWindowButton(_maximizeButton, BarGlyph.Maximize, "Maximize");
+        ConfigureWindowButton(_closeButton, BarGlyph.Close, "Close");
         foreach (var button in new[] { _minimizeButton, _maximizeButton, _closeButton })
         {
             button.Size = new Size(44, TopBarHeight);
             button.Top = 0;
-            button.Font = new Font("Segoe MDL2 Assets", 7.5F);
+            button.WindowControl = true;
         }
-        _closeButton.FlatAppearance.MouseOverBackColor = Color.FromArgb(196, 43, 28);
-        _closeButton.FlatAppearance.MouseDownBackColor = Color.FromArgb(160, 34, 22);
         _minimizeButton.Click += (_, _) => WindowState = FormWindowState.Minimized;
         _maximizeButton.Click += (_, _) => ToggleMaximize();
         _closeButton.Click += (_, _) => Close();
@@ -378,14 +710,18 @@ internal sealed class MeterWindow : Form
         _closeButton.Left = _topBar.ClientSize.Width - _closeButton.Width;
         _maximizeButton.Left = _closeButton.Left - _maximizeButton.Width;
         _minimizeButton.Left = _maximizeButton.Left - _minimizeButton.Width;
-        _settingsButton.Left = _minimizeButton.Left - 8 - _settingsButton.Width;
+        _settingsButton.Left = _minimizeButton.Left - ToolGap - _settingsButton.Width;
         _pinButton.Left = _settingsButton.Left - _pinButton.Width;
         _layoutButton.Left = _pinButton.Left - _layoutButton.Width;
-        _status.Left = _layoutButton.Left - _status.Width - 10;
+        _status.Left = _layoutButton.Left - _status.Width - 8;
         _status.Top = (TopBarHeight - _status.Height) / 2;
-        // Hide the status text rather than let it run into the logo.
-        _status.Visible = _status.Left > TopBarLogoRight + 16;
+        // Only problems are shown (no output, reconnecting, error); hide it too rather than run into the logo.
+        _status.Visible = _statusProblem && _status.Left > TopBarLogoRight + 16;
+        _topBar.Invalidate();
     }
+
+    /// <summary>Space between the tool buttons and the window controls, with a short divider in the middle.</summary>
+    private const int ToolGap = 13;
 
     private void PaintTopBar(Graphics graphics)
     {
@@ -393,6 +729,8 @@ internal sealed class MeterWindow : Form
         graphics.TextRenderingHint = UiFonts.Rendering;
         using var hairline = new Pen(Palette.Line);
         graphics.DrawLine(hairline, 0, _topBar.Height - 1, _topBar.Width, _topBar.Height - 1);
+        var divider = _minimizeButton.Left - ToolGap / 2 - 1;
+        graphics.DrawLine(hairline, divider, TopBarHeight / 2 - 6, divider, TopBarHeight / 2 + 6);
 
         // Logo: the SPECTRM wordmark and bar mark, drawn from the vector paths in "SPECTRM logo.svg".
         // The bar mark is drawn on whole pixels so its 1 px bars stay crisp at this size.
@@ -437,19 +775,12 @@ internal sealed class MeterWindow : Form
         return stream is null ? null : new Icon(stream);
     }
 
-    private void ConfigureWindowButton(Button button, string text, string tooltip)
+    private void ConfigureWindowButton(BarButton button, BarGlyph glyph, string tooltip)
     {
-        button.Text = text;
+        button.Glyph = glyph;
         button.Size = new Size(44, TopBarHeight);
         button.Top = 0;
-        button.FlatStyle = FlatStyle.Flat;
-        button.FlatAppearance.BorderSize = 0;
-        button.FlatAppearance.BorderColor = Background;
-        button.FlatAppearance.MouseOverBackColor = Palette.Hover;
-        button.FlatAppearance.MouseDownBackColor = Palette.Line;
         button.BackColor = Background;
-        button.ForeColor = Palette.Ink;
-        button.Font = new Font(UiFonts.Text, 12F);
         button.Cursor = Cursors.Hand;
         button.TabStop = true;
         button.AccessibleName = tooltip;
@@ -570,6 +901,12 @@ internal sealed class MeterWindow : Form
         {
             _splash.Skip();
             if (keyData == Keys.Escape) return true;
+        }
+
+        if (_draggedChart is not null && keyData == Keys.Escape)
+        {
+            EndPanelDrag(cancel: true); // put the panels back where they were
+            return true;
         }
 
         if (keyData == (Keys.Control | Keys.Shift | Keys.M))
@@ -720,7 +1057,8 @@ internal sealed class MeterWindow : Form
 
     private void UpdateMaximizeButton()
     {
-        _maximizeButton.Text = WindowState == FormWindowState.Maximized ? "" : "";
+        _maximizeButton.Glyph = WindowState == FormWindowState.Maximized ? BarGlyph.Restore : BarGlyph.Maximize;
+        _maximizeButton.Invalidate();
         _statusTooltip.SetToolTip(_maximizeButton, WindowState == FormWindowState.Maximized ? "Restore" : "Maximize");
     }
 
@@ -739,9 +1077,13 @@ internal sealed class MeterWindow : Form
         }
     }
 
-    // Share of the strip each meter gets, in display order, for each layout.
+    // Default panel order, and the share of the strip each kind of meter gets (it keeps its share when moved).
+    private static readonly ChartKind[] DefaultPanelOrder = { ChartKind.Spectrogram, ChartKind.Waveform, ChartKind.LufsMeter, ChartKind.Vectorscope, ChartKind.VuMeter, ChartKind.Oscilloscope, ChartKind.Spectrum };
     private static readonly float[] HorizontalWeights = { 18F, 12.5F, 6.5F, 13F, 16F, 10F, 24F };
     private static readonly float[] VerticalWeights = { 16F, 11F, 9F, 16F, 18F, 11F, 19F };
+    private ChartKind[] _panelOrder = DefaultPanelOrder.ToArray();
+
+    private float WeightOf(ChartKind kind) => (_vertical ? VerticalWeights : HorizontalWeights)[Array.IndexOf(DefaultPanelOrder, kind)];
 
     private Control BuildCharts()
     {
@@ -751,14 +1093,95 @@ internal sealed class MeterWindow : Form
             BackColor = Background,
             Padding = Padding.Empty,
         };
-        foreach (var kind in new[] { ChartKind.Spectrogram, ChartKind.Waveform, ChartKind.LufsMeter, ChartKind.Vectorscope, ChartKind.VuMeter, ChartKind.Oscilloscope, ChartKind.Spectrum })
+        foreach (var kind in _panelOrder)
         {
             var chart = new MeterChart(kind) { Dock = DockStyle.Fill, Margin = Padding.Empty };
-            chart.MouseDown += (_, e) => BeginWindowDrag(e);
+            // Dragging a panel's grip (or Ctrl+drag anywhere on it) rearranges panels; any other drag moves the window.
+            chart.MouseDown += (_, e) =>
+            {
+                if (e.Button == MouseButtons.Left && (chart.IsOverGrip(e.Location) || (ModifierKeys & Keys.Control) != 0))
+                    StartPanelDrag(chart, e.Location);
+                else
+                    BeginWindowDrag(e);
+            };
+            chart.MouseMove += (_, e) => { if (_draggedChart == chart) PanelDragMove(chart.PointToScreen(e.Location)); };
+            chart.MouseUp += (_, _) => { if (_draggedChart == chart) EndPanelDrag(cancel: false); };
+            chart.MouseCaptureChanged += (_, _) => { if (_draggedChart == chart && !chart.Capture) EndPanelDrag(cancel: false); };
             _charts.Add(chart);
         }
         ApplyChartLayout();
         return _chartGrid;
+    }
+
+    // ---------- Rearranging panels ----------
+
+    private MeterChart? _draggedChart;
+    private float _dragGrabOffset;              // where in the panel it was grabbed, along the strip
+    private ChartKind[] _orderBeforeDrag = Array.Empty<ChartKind>();
+
+    private void StartPanelDrag(MeterChart chart, Point grabPoint)
+    {
+        _draggedChart = chart;
+        _orderBeforeDrag = _charts.Select(c => c.Kind).ToArray();
+        _dragGrabOffset = _vertical ? grabPoint.Y : grabPoint.X;
+        chart.Dragging = true;
+        chart.Capture = true;
+    }
+
+    /// <summary>
+    /// Moves the dragged panel past a neighbour once the panel's centre (following the pointer) crosses the
+    /// neighbour's centre. Panels have different widths, so comparing centres keeps it from flipping back and forth.
+    /// </summary>
+    private void PanelDragMove(Point screenPoint)
+    {
+        if (_draggedChart is not { } chart || _chartGrid is null) return;
+        var pointer = _chartGrid.PointToClient(screenPoint);
+        float Start(Control c) => _vertical ? c.Top : c.Left;
+        float Size(Control c) => _vertical ? c.Height : c.Width;
+        var center = (_vertical ? pointer.Y : pointer.X) - _dragGrabOffset + Size(chart) / 2f;
+        for (var guard = 0; guard < _charts.Count; guard++)
+        {
+            var index = _charts.IndexOf(chart);
+            var target = index;
+            if (index < _charts.Count - 1 && center > Start(_charts[index + 1]) + Size(_charts[index + 1]) / 2f) target = index + 1;
+            else if (index > 0 && center < Start(_charts[index - 1]) + Size(_charts[index - 1]) / 2f) target = index - 1;
+            if (target == index) break;
+            (_charts[index], _charts[target]) = (_charts[target], _charts[index]);
+            UpdateChartPositions();
+        }
+    }
+
+    private void EndPanelDrag(bool cancel)
+    {
+        if (_draggedChart is not { } chart) return;
+        _draggedChart = null;
+        chart.Dragging = false;
+        if (chart.Capture) chart.Capture = false;
+        if (cancel)
+        {
+            _charts.Sort((a, b) => Array.IndexOf(_orderBeforeDrag, a.Kind).CompareTo(Array.IndexOf(_orderBeforeDrag, b.Kind)));
+            UpdateChartPositions();
+            return;
+        }
+        var order = _charts.Select(c => c.Kind).ToArray();
+        if (order.SequenceEqual(_panelOrder)) return;
+        _panelOrder = order;
+        SaveSettings();
+    }
+
+    /// <summary>Moves panels to their cells in the current order without removing them (so a drag keeps the mouse).</summary>
+    private void UpdateChartPositions()
+    {
+        if (_chartGrid is null) return;
+        var grid = _chartGrid;
+        grid.SuspendLayout();
+        for (var i = 0; i < _charts.Count; i++)
+        {
+            var weight = WeightOf(_charts[i].Kind);
+            if (_vertical) grid.RowStyles[i].Height = weight; else grid.ColumnStyles[i].Width = weight;
+            grid.SetCellPosition(_charts[i], new TableLayoutPanelCellPosition(_vertical ? 0 : i, _vertical ? i : 0));
+        }
+        grid.ResumeLayout(true);
     }
 
     /// <summary>Places the meters in one row (horizontal) or one column (vertical).</summary>
@@ -766,7 +1189,6 @@ internal sealed class MeterWindow : Form
     {
         if (_chartGrid is null) return;
         var grid = _chartGrid;
-        var weights = _vertical ? VerticalWeights : HorizontalWeights;
         grid.SuspendLayout();
         grid.Controls.Clear();
         grid.ColumnStyles.Clear();
@@ -776,11 +1198,11 @@ internal sealed class MeterWindow : Form
         if (_vertical)
         {
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            foreach (var weight in weights) grid.RowStyles.Add(new RowStyle(SizeType.Percent, weight));
+            foreach (var chart in _charts) grid.RowStyles.Add(new RowStyle(SizeType.Percent, WeightOf(chart.Kind)));
         }
         else
         {
-            foreach (var weight in weights) grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, weight));
+            foreach (var chart in _charts) grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, WeightOf(chart.Kind)));
             grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         }
         for (var i = 0; i < _charts.Count; i++)
@@ -838,8 +1260,7 @@ internal sealed class MeterWindow : Form
 
     private void UpdatePinButton()
     {
-        _pinButton.Text = _pinned ? "" : "";
-        _pinButton.ForeColor = _pinned ? Palette.Accent : Palette.Ink;
+        _pinButton.Active = _pinned;
         var tip = _pinned ? "Unpin: stop staying on top (Alt+P)" : "Pin: always stay on top (Alt+P)";
         _statusTooltip.SetToolTip(_pinButton, tip);
         _pinButton.AccessibleName = tip;
@@ -850,26 +1271,8 @@ internal sealed class MeterWindow : Form
         var tip = _vertical ? "Switch to horizontal layout (Alt+L)" : "Switch to vertical layout (Alt+L)";
         _statusTooltip.SetToolTip(_layoutButton, tip);
         _layoutButton.AccessibleName = tip;
-        _layoutButton.Invalidate();
+        _layoutButton.Vertical = _vertical;
         _settingsOverlay.Vertical = _vertical;
-    }
-
-    /// <summary>Draws the layout icon: the strip it switches to (a row of bars, or a column of bars).</summary>
-    private void PaintLayoutIcon(Graphics graphics)
-    {
-        graphics.SmoothingMode = SmoothingMode.None;
-        using var brush = new SolidBrush(_layoutButton.ForeColor);
-        var cx = _layoutButton.Width / 2;
-        var cy = _layoutButton.Height / 2;
-        if (_vertical)
-        {
-            // Currently vertical -> icon shows a horizontal strip of three cells.
-            for (var i = 0; i < 3; i++) graphics.FillRectangle(brush, cx - 8 + i * 6, cy - 3, 4, 6);
-        }
-        else
-        {
-            for (var i = 0; i < 3; i++) graphics.FillRectangle(brush, cx - 3, cy - 8 + i * 6, 6, 4);
-        }
     }
 
     private static void DrawBorder(Graphics graphics, Rectangle bounds, Color color, int radius)
@@ -920,6 +1323,8 @@ internal sealed class MeterWindow : Form
                     case "fps" when int.TryParse(value, out var fps) && fps is 30 or 60 or 120: _targetFps = fps; break;
                     case "layout" when value is "horizontal" or "vertical": _vertical = value == "vertical"; break;
                     case "pinned" when value is "true" or "false": _pinned = value == "true"; break;
+                    case "order" when TryParsePanelOrder(value, out var order): _panelOrder = order; break;
+                    case "theme" when ColorTheme.All.Any(theme => theme.Id == value): _theme = ColorTheme.ById(value); break;
                     default: invalid.Add(line); break;
                 }
             }
@@ -947,6 +1352,8 @@ internal sealed class MeterWindow : Form
                 $"fps={(_targetFps == 0 ? "unlimited" : _targetFps.ToString())}",
                 $"layout={(_vertical ? "vertical" : "horizontal")}",
                 $"pinned={(_pinned ? "true" : "false")}",
+                $"order={string.Join(",", _panelOrder)}",
+                $"theme={_theme.Id}",
             });
         }
         catch (IOException exception)
@@ -957,6 +1364,21 @@ internal sealed class MeterWindow : Form
         {
             ShowError($"Could not save your settings. They will apply until SPECTRM closes.\n\n{exception.Message}");
         }
+    }
+
+    /// <summary>Reads "spectrogram,waveform,..." — must list every panel exactly once.</summary>
+    private static bool TryParsePanelOrder(string value, out ChartKind[] order)
+    {
+        order = Array.Empty<ChartKind>();
+        var parsed = new List<ChartKind>();
+        foreach (var name in value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!Enum.TryParse<ChartKind>(name, ignoreCase: true, out var kind) || !Enum.IsDefined(kind) || parsed.Contains(kind)) return false;
+            parsed.Add(kind);
+        }
+        if (parsed.Count != DefaultPanelOrder.Length) return false;
+        order = parsed.ToArray();
+        return true;
     }
 
     private static string GetSettingsPath() =>
@@ -972,7 +1394,7 @@ internal sealed class MeterWindow : Form
 
     private void ConfigureFrameRate()
     {
-        _timer.Interval = _targetFps switch { 30 => 33, 60 => 16, 120 => 8, _ => 1 };
+        if (_frameClock is not null) _frameClock.FramesPerSecond = _targetFps;
         var frameRate = _targetFps == 0 ? "Unlimited" : $"{_targetFps}";
         _settingsButton.AccessibleName = $"Options, frame rate currently {frameRate} FPS";
         _statusTooltip.SetToolTip(_settingsButton, $"Options · {frameRate} FPS (Alt+S)");
@@ -1001,6 +1423,7 @@ internal sealed class MeterWindow : Form
             SetVertical(vertical);
         };
         _settingsOverlay.PinToggled += () => SetPinned(!_pinned);
+        _settingsOverlay.ThemeChosen += index => SetTheme(ColorTheme.All[index]); // stays open so themes can be compared
         _settingsOverlay.CloseRequested += CloseSettings;
         _settingsOverlay.MouseDown += (_, e) =>
         {
@@ -1209,11 +1632,27 @@ internal sealed class MeterWindow : Form
         _deviceEnumerator = null;
     }
 
+    /// <summary>One frame from the frame clock: update the meters, then paint them right away, so the next frame
+    /// isn't posted until this one is on screen (posted messages otherwise starve WM_PAINT at high rates).</summary>
+    private void RenderFrame()
+    {
+        RefreshMeters();
+        if (IsHandleCreated && WindowState != FormWindowState.Minimized)
+            RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, RedrawUpdateNow | RedrawAllChildren);
+    }
+
+    private const uint RedrawUpdateNow = 0x0100;
+    private const uint RedrawAllChildren = 0x0080;
+
+    [DllImport("user32.dll")]
+    private static extern bool RedrawWindow(IntPtr window, IntPtr rect, IntPtr region, uint flags);
+
     private void RefreshMeters()
     {
         if (_disposed) return;
         if (_lastOutputError is not null)
             SetStatus($"OUTPUT ERROR: {_lastOutputError}");
+        _analysis.FillSilenceIfStalled(); // so meters fall back when playback stops instead of freezing
         var snapshot = _analysis.GetSnapshot();
         _snapshot = snapshot;
         if (!snapshot.HasSignal && _targetFps == 0)
@@ -1222,7 +1661,12 @@ internal sealed class MeterWindow : Form
             if ((now - _lastIdleRefresh).TotalMilliseconds < 33) return;
             _lastIdleRefresh = now;
         }
-        if (snapshot.HasSignal && _lastDisplayedGeneration == snapshot.Generation) return;
+        if (snapshot.HasSignal && _lastDisplayedGeneration == snapshot.Generation)
+        {
+            // No new audio yet (Windows delivers it every 10 ms), but the needle and peak holds still move in time.
+            foreach (var chart in _charts) chart.Invalidate();
+            return;
+        }
         _lastDisplayedGeneration = snapshot.Generation;
         foreach (var chart in _charts) chart.SetSnapshot(snapshot);
     }
@@ -1230,7 +1674,7 @@ internal sealed class MeterWindow : Form
     private void SetStatus(string text, bool active = false)
     {
         _status.Text = active
-            ? "● LIVE"
+            ? ""
             : text.StartsWith("DEFAULT OUTPUT UNAVAILABLE", StringComparison.OrdinalIgnoreCase)
                 ? "● NO OUTPUT"
                 : text.StartsWith("RECONNECTING", StringComparison.OrdinalIgnoreCase)
@@ -1238,8 +1682,37 @@ internal sealed class MeterWindow : Form
                     : text.StartsWith("OUTPUT ERROR", StringComparison.OrdinalIgnoreCase)
                         ? "● ERROR"
                         : "● OFFLINE";
+        _statusText = text;
+        _statusActive = active;
         _status.ForeColor = active ? Palette.Accent : text.Contains("ERROR", StringComparison.OrdinalIgnoreCase) || text.Contains("UNAVAILABLE", StringComparison.OrdinalIgnoreCase) ? Palette.Highlight : Muted;
         _statusTooltip.SetToolTip(_status, text);
+        _statusProblem = !active && !_status.Text.EndsWith("OFFLINE", StringComparison.Ordinal);
+        LayoutTopBar();
+    }
+
+    private bool _statusProblem;
+
+    private string _statusText = "OFFLINE";
+    private bool _statusActive;
+    private ColorTheme _theme = ColorTheme.All[0];
+
+    private void SetTheme(ColorTheme theme)
+    {
+        _theme = theme;
+        Palette.Apply(theme);
+        _settingsOverlay.CurrentTheme = Array.IndexOf(ColorTheme.All, theme);
+        SaveSettings();
+    }
+
+    /// <summary>Re-colours the controls that copy palette colours when they are set up; everything else repaints.</summary>
+    private void ApplyThemeColors()
+    {
+        UpdatePinButton();
+        SetStatus(_statusText, _statusActive);
+        _topBar.Invalidate(true);
+        _settingsOverlay.Invalidate();
+        foreach (var chart in _charts) chart.OnThemeChanged();
+        _splash?.Invalidate();
     }
 
     private void ShowError(string message)
@@ -1250,7 +1723,8 @@ internal sealed class MeterWindow : Form
     private void DisposeAudio()
     {
         _disposed = true;
-        _timer.Stop();
+        _frameClock?.Dispose();
+        _frameClock = null;
         _deviceTimer.Stop();
         _topBarTimer.Stop();
         _glideTimer.Stop();
@@ -1261,7 +1735,6 @@ internal sealed class MeterWindow : Form
             _timerResolutionActive = false;
         }
         _statusTooltip.Dispose();
-        _timer.Dispose();
         _deviceTimer.Dispose();
         _topBarTimer.Dispose();
         _glideTimer.Dispose();
@@ -1271,7 +1744,7 @@ internal sealed class MeterWindow : Form
 internal sealed class SettingsOverlay : Control
 {
     /// <summary>Smallest client area for the wide (strip) arrangement.</summary>
-    public static readonly Size WideMinimum = new(1140, 120);
+    public static readonly Size WideMinimum = new(1700, 120);
 
     // Every tile uses the same template: title top-left, description under it, key hint in the bottom-right corner.
     private const int TileWidth = 116;
@@ -1279,20 +1752,23 @@ internal sealed class SettingsOverlay : Control
     private const int LabelHeight = 16;
     private const int TilePadding = 13;
     /// <summary>Smallest client area for the tall (column) arrangement.</summary>
-    public static readonly Size TallMinimum = new(300, 420);
+    public static readonly Size TallMinimum = new(300, 620);
+    private const int ThemeTileWidth = 104;
 
-    private enum ItemKind { Fps, Layout, Pin, Close }
+    private enum ItemKind { Fps, Layout, Pin, Theme, Close }
     private sealed record Item(ItemKind Kind, int Value, string Key);
 
     private const int TileGap = 6;
     private const int GroupGap = 22;
 
-    private static readonly Color Ink = Palette.Ink;
-    private static readonly Color Muted = Palette.Label;
-    private static readonly Color TileFill = Color.FromArgb(7, 15, 14);
-    private static readonly Color TileHover = Palette.Hover;
-    private static readonly Color TileSelected = Color.FromArgb(11, 28, 26);
-    private static readonly Color TileBorder = Palette.Line;
+    // Read from the active theme each time, so the panel recolours as soon as a theme is picked.
+    private static Color Ink => Palette.Ink;
+    private static Color Muted => Palette.Label;
+    private static Color TileFill => Palette.Mix(Color.Black, Palette.Track, 0.7);
+    private static Color TileHover => Palette.Hover;
+    private static Color TileSelected => Palette.Mix(Palette.Track, Palette.Box, 0.6);
+    private static Color TileBorder => Palette.Line;
+    private static Color TileBorderStrong => Palette.Mix(Palette.Line, Palette.Accent, 0.35);
     private static readonly Font EyebrowFont = new(UiFonts.Small, 7.5F, FontStyle.Bold);
     private static readonly Font HeadingFont = new(UiFonts.Display, 15F, FontStyle.Bold);
     private static readonly Font HintFont = new(UiFonts.Small, 7.5F, FontStyle.Bold);
@@ -1308,6 +1784,7 @@ internal sealed class SettingsOverlay : Control
     };
     private static readonly Item[] LayoutItems = { new(ItemKind.Layout, 0, "H"), new(ItemKind.Layout, 1, "V") };
     private static readonly Item PinItem = new(ItemKind.Pin, 0, "P");
+    private static readonly Item[] ThemeItems = Enumerable.Range(0, ColorTheme.All.Length).Select(i => new Item(ItemKind.Theme, i, "")).ToArray();
     private static readonly Item CloseItem = new(ItemKind.Close, 0, "");
 
     private readonly List<(Rectangle Bounds, Item Item)> _items = new();
@@ -1318,8 +1795,10 @@ internal sealed class SettingsOverlay : Control
     private int _currentFps = 60;
     private bool _vertical;
     private bool _pinned;
+    private int _currentTheme;
 
     public event Action<int>? FpsChosen;
+    public event Action<int>? ThemeChosen;
     public event Action<bool>? LayoutChosen;
     public event Action? PinToggled;
     public event Action? CloseRequested;
@@ -1352,6 +1831,12 @@ internal sealed class SettingsOverlay : Control
         set { _pinned = value; Invalidate(); }
     }
 
+    public int CurrentTheme
+    {
+        get => _currentTheme;
+        set { _currentTheme = value; Invalidate(); }
+    }
+
     public bool IsInteractive(Point point) => HitTest(point) >= 0;
 
     protected override void OnResize(EventArgs e)
@@ -1378,20 +1863,21 @@ internal sealed class SettingsOverlay : Control
         // One block, vertically centred: group labels share a top line with the "SPECTRM / OPTIONS" eyebrow,
         // and every tile starts on the same line below them.
         const int textWidth = 196;
-        var total = textWidth + GroupGap + (4 * TileWidth + 3 * TileGap) + GroupGap + (2 * TileWidth + TileGap) + GroupGap + TileWidth;
+        var total = textWidth + GroupGap + (4 * TileWidth + 3 * TileGap) + GroupGap + (2 * TileWidth + TileGap) + GroupGap + TileWidth
+            + GroupGap + (ThemeItems.Length * ThemeTileWidth + (ThemeItems.Length - 1) * TileGap);
         var left = Math.Max(16, (width - total) / 2);
         var blockTop = (height - (LabelHeight + TileHeight)) / 2;
         _headingOrigin = new Point(left, blockTop);
         var top = blockTop + LabelHeight;
         var x = left + textWidth + GroupGap;
 
-        void Group(string label, IEnumerable<Item> items)
+        void Group(string label, IEnumerable<Item> items, int tileWidth = TileWidth)
         {
             _groupLabels.Add((new PointF(x, blockTop), label));
             foreach (var item in items)
             {
-                _items.Add((new Rectangle(x, top, TileWidth, TileHeight), item));
-                x += TileWidth + TileGap;
+                _items.Add((new Rectangle(x, top, tileWidth, TileHeight), item));
+                x += tileWidth + TileGap;
             }
             x += GroupGap - TileGap;
         }
@@ -1399,6 +1885,7 @@ internal sealed class SettingsOverlay : Control
         Group("FRAME RATE", FpsItems);
         Group("LAYOUT", LayoutItems);
         Group("WINDOW", new[] { PinItem });
+        Group("THEMES", ThemeItems, ThemeTileWidth);
     }
 
     private void ArrangeTall(int width, int height)
@@ -1407,10 +1894,12 @@ internal sealed class SettingsOverlay : Control
         var contentWidth = Math.Min(width - 32, 320);
         var left = (width - contentWidth) / 2;
         var half = (contentWidth - TileGap) / 2;
+        var themeRows = (ThemeItems.Length + 1) / 2;
         var blockHeight = headingHeight
             + labelHeight + tileHeight * 2 + TileGap + sectionGap
             + labelHeight + tileHeight + sectionGap
-            + labelHeight + tileHeight;
+            + labelHeight + tileHeight + sectionGap
+            + labelHeight + themeRows * tileHeight + (themeRows - 1) * TileGap;
         var y = Math.Max(36, (height - blockHeight) / 2);
         _headingOrigin = new Point(left, y);
         y += headingHeight;
@@ -1430,6 +1919,12 @@ internal sealed class SettingsOverlay : Control
         _groupLabels.Add((new PointF(left, y), "WINDOW"));
         y += labelHeight;
         _items.Add((new Rectangle(left, y, contentWidth, tileHeight), PinItem));
+        y += tileHeight + sectionGap;
+
+        _groupLabels.Add((new PointF(left, y), "THEMES"));
+        y += labelHeight;
+        for (var i = 0; i < ThemeItems.Length; i++)
+            _items.Add((new Rectangle(left + (i % 2) * (half + TileGap), y + (i / 2) * (tileHeight + TileGap), half, tileHeight), ThemeItems[i]));
     }
 
     private int HitTest(Point point)
@@ -1472,6 +1967,7 @@ internal sealed class SettingsOverlay : Control
             case ItemKind.Fps: FpsChosen?.Invoke(item.Value); break;
             case ItemKind.Layout: LayoutChosen?.Invoke(item.Value == 1); break;
             case ItemKind.Pin: PinToggled?.Invoke(); break;
+            case ItemKind.Theme: ThemeChosen?.Invoke(item.Value); break;
             case ItemKind.Close: CloseRequested?.Invoke(); break;
         }
     }
@@ -1487,6 +1983,8 @@ internal sealed class SettingsOverlay : Control
             Keys.H => LayoutItems[0],
             Keys.V => LayoutItems[1],
             Keys.P => PinItem,
+            Keys.T => ThemeItems[(_currentTheme + 1) % ThemeItems.Length],                         // next theme
+            Keys.Shift | Keys.T => ThemeItems[(_currentTheme + ThemeItems.Length - 1) % ThemeItems.Length], // previous
             _ => null,
         };
         if (item is not null)
@@ -1502,6 +2000,7 @@ internal sealed class SettingsOverlay : Control
         ItemKind.Fps => item.Value == _currentFps,
         ItemKind.Layout => (item.Value == 1) == _vertical,
         ItemKind.Pin => _pinned,
+        ItemKind.Theme => item.Value == _currentTheme,
         _ => false,
     };
 
@@ -1516,6 +2015,7 @@ internal sealed class SettingsOverlay : Control
         },
         ItemKind.Layout => item.Value == 1 ? ("VERTICAL", "Tall column") : ("HORIZONTAL", "Wide strip"),
         ItemKind.Pin => ("ON TOP", _pinned ? "Pinned" : "Off"),
+        ItemKind.Theme => (ColorTheme.All[item.Value].Name.ToUpperInvariant(), ""),
         _ => ("", ""),
     };
 
@@ -1538,7 +2038,7 @@ internal sealed class SettingsOverlay : Control
         graphics.DrawString("SPECTRM  /  OPTIONS", GroupFont, accentBrush, x, y);
         graphics.DrawString("Options", HeadingFont, inkBrush, x - 2, y + LabelHeight - 4);
         graphics.DrawString("1–4 rate  ·  H / V layout", HintFont, mutedBrush, x, y + LabelHeight + 24);
-        graphics.DrawString("P pin  ·  Esc close", HintFont, mutedBrush, x, y + LabelHeight + 36);
+        graphics.DrawString("P pin  ·  T theme  ·  Esc close", HintFont, mutedBrush, x, y + LabelHeight + 36);
 
         foreach (var (position, text) in _groupLabels)
             graphics.DrawString(text, GroupFont, mutedBrush, position.X, position.Y);
@@ -1552,20 +2052,25 @@ internal sealed class SettingsOverlay : Control
             using var path = RoundedRectangle(tile, 5);
             using (var fill = new SolidBrush(hovered ? TileHover : selected ? TileSelected : TileFill))
                 graphics.FillPath(fill, path);
-            using (var border = new Pen(selected ? Palette.Accent : hovered ? Color.FromArgb(48, 92, 84) : TileBorder))
+            using (var border = new Pen(selected ? Palette.Accent : hovered ? TileBorderStrong : TileBorder))
                 graphics.DrawPath(border, path);
             if (selected)
                 graphics.FillRectangle(highlightBrush, tile.Left + 1, tile.Top + 11, 3, tile.Height - 22);
 
             var (title, detail) = Describe(item);
             graphics.DrawString(title, TileTitleFont, selected ? accentBrush : inkBrush, tile.Left + TilePadding, tile.Top + 8);
+            if (item.Kind == ItemKind.Theme)
+            {
+                DrawThemePreview(graphics, ColorTheme.All[item.Value], tile.Left + TilePadding, tile.Top + 29, tile.Right - TilePadding);
+                continue;
+            }
             graphics.DrawString(detail, TileDetailFont, mutedBrush, tile.Left + TilePadding, tile.Top + 27);
 
             // Key hint: a small keycap pinned to the bottom-right corner, level with the description.
             var keySize = graphics.MeasureString(item.Key, TagFont);
             var cap = new RectangleF(tile.Right - 8 - Math.Max(13, keySize.Width + 4), tile.Bottom - 8 - 13, Math.Max(13, keySize.Width + 4), 13);
             using (var capPath = RoundedRectangle(Rectangle.Round(cap), 3))
-            using (var capPen = new Pen(selected ? Color.FromArgb(48, 92, 84) : TileBorder))
+            using (var capPen = new Pen(selected ? TileBorderStrong : TileBorder))
                 graphics.DrawPath(capPen, capPath);
             graphics.DrawString(item.Key, TagFont, mutedBrush, cap.Left + (cap.Width - keySize.Width) / 2, cap.Top + (cap.Height - keySize.Height) / 2);
         }
@@ -1586,6 +2091,30 @@ internal sealed class SettingsOverlay : Control
                 closeBox.Left + (closeBox.Width - glyphSize.Width) / 2,
                 closeBox.Top + (closeBox.Height - glyphSize.Height) / 2);
         }
+    }
+
+    /// <summary>A theme's look in miniature: its three accent dots, then a strip of its spectrogram colours.</summary>
+    private static void DrawThemePreview(Graphics graphics, ColorTheme theme, float left, float top, float right)
+    {
+        const float dot = 9, gap = 4;
+        var x = left;
+        foreach (var color in new[] { theme.Accent, theme.Secondary, theme.Highlight })
+        {
+            using var brush = new SolidBrush(color);
+            graphics.FillEllipse(brush, x, top, dot, dot);
+            x += dot + gap;
+        }
+        var strip = new RectangleF(x + 2, top + 1.5f, Math.Max(8, right - x - 2), dot - 3);
+        using var gradient = new LinearGradientBrush(new RectangleF(strip.X - 1, strip.Y, strip.Width + 2, strip.Height), Color.Black, Color.White, 0f)
+        {
+            InterpolationColors = new ColorBlend
+            {
+                Colors = theme.Spectrogram,
+                Positions = Enumerable.Range(0, theme.Spectrogram.Length).Select(i => i / (float)(theme.Spectrogram.Length - 1)).ToArray(),
+            },
+        };
+        using var stripPath = RoundedRectangle(Rectangle.Round(strip), 2);
+        graphics.FillPath(gradient, stripPath);
     }
 
     private static GraphicsPath RoundedRectangle(Rectangle bounds, int radius)
@@ -1612,6 +2141,8 @@ internal sealed class AnalysisSnapshot
     public float[] SpectrumDb { get; set; } = Array.Empty<float>();
     public double ShortTermDb { get; set; } = -100;
     public double MomentaryLufs { get; set; } = -100;
+    /// <summary>K-weighted loudness over ~25 ms (LUFS units): what the VU needle's movement follows.</summary>
+    public double FastLufs { get; set; } = -100;
     public double ShortTermLufs { get; set; } = -100;
     public double LufsLeft { get; set; } = -100;
     public double LufsRight { get; set; } = -100;
@@ -1653,6 +2184,9 @@ internal sealed class AnalysisEngine
     private long _snapshotGeneration = -1;
     private double _shortTermEnergy;
     private double _lufsEnergy;
+    // K-weighted loudness with only a 25 ms average: drives the VU needle, whose own mass and damping do the rest.
+    private const double FastLoudnessSeconds = 0.025;
+    private double _fastLufsEnergy;
     private double _lufsEnergyLeft;
     private double _lufsEnergyRight;
     private double _rmsEnergyLeft;
@@ -1667,10 +2201,48 @@ internal sealed class AnalysisEngine
     private int _lufsFilterSampleRate;
     private BiquadCoefficients _lufsHighShelf;
     private BiquadCoefficients _lufsHighPass;
+    // Windows loopback capture delivers nothing while no app is playing, which would freeze the meters on the last
+    // loud value. When the stream stalls, the gap is filled with digital silence so loudness falls as it really does.
+    private const double StallSeconds = 0.25;
+    private readonly System.Diagnostics.Stopwatch _sinceLastCapture = new();
+    private long _silenceFramesAdded;
+    private int _lastChannels;
+    private float[] _silence = Array.Empty<float>();
+
     public void PushInterleaved(ReadOnlySpan<float> samples, int channels, int sampleRate)
     {
         if (channels < 1) return;
         lock (_gate)
+        {
+            _sinceLastCapture.Restart();
+            _silenceFramesAdded = 0;
+            _lastChannels = channels;
+            PushLocked(samples, channels, sampleRate);
+        }
+    }
+
+    /// <summary>Called on every display refresh: if capture has gone quiet, feed silence for the time that has passed.</summary>
+    public void FillSilenceIfStalled()
+    {
+        lock (_gate)
+        {
+            if (!_sinceLastCapture.IsRunning || _lufsFilterSampleRate <= 0 || _lastChannels < 1) return;
+            var elapsed = _sinceLastCapture.Elapsed.TotalSeconds;
+            if (elapsed < StallSeconds) return;
+            // Cap the backlog so a long pause (sleep, device change) doesn't stall the UI thread.
+            var due = (long)(elapsed * _lufsFilterSampleRate) - _silenceFramesAdded;
+            var frames = (int)Math.Min(due, _lufsFilterSampleRate);
+            if (frames <= 0) return;
+            if (due > _lufsFilterSampleRate) _silenceFramesAdded += due - frames; // skip what we won't replay
+            var length = frames * _lastChannels;
+            if (_silence.Length < length) _silence = new float[length];
+            PushLocked(_silence.AsSpan(0, length), _lastChannels, _lufsFilterSampleRate);
+            _silenceFramesAdded += frames;
+        }
+    }
+
+    private void PushLocked(ReadOnlySpan<float> samples, int channels, int sampleRate)
+    {
         {
             if (_lufsFilterSampleRate != sampleRate)
                 ConfigureLufsFilters(sampleRate);
@@ -1710,6 +2282,8 @@ internal sealed class AnalysisEngine
             var smoothing = Math.Exp(-(double)frames / (sampleRate * LevelSmoothingSeconds));
             _shortTermEnergy = smoothing * _shortTermEnergy + (1 - smoothing) * blockEnergy / frames;
             _lufsEnergy = smoothing * _lufsEnergy + (1 - smoothing) * lufsBlockEnergy / frames;
+            var fastSmoothing = Math.Exp(-(double)frames / (sampleRate * FastLoudnessSeconds));
+            _fastLufsEnergy = fastSmoothing * _fastLufsEnergy + (1 - fastSmoothing) * lufsBlockEnergy / frames;
             _lufsEnergyLeft = smoothing * _lufsEnergyLeft + (1 - smoothing) * lufsLeft / frames;
             _lufsEnergyRight = smoothing * _lufsEnergyRight + (1 - smoothing) * lufsRight / frames;
             _rmsEnergyLeft = smoothing * _rmsEnergyLeft + (1 - smoothing) * rmsLeft / frames;
@@ -1726,6 +2300,7 @@ internal sealed class AnalysisEngine
         double rightEnergy = 0;
         double shortTermEnergy;
         double lufsEnergy;
+        double fastLufsEnergy;
         double lufsEnergyLeft, lufsEnergyRight, rmsEnergyLeft, rmsEnergyRight, shortTermLufsEnergy;
         int sampleRate;
         lock (_gate)
@@ -1740,6 +2315,7 @@ internal sealed class AnalysisEngine
             generation = _generation;
             shortTermEnergy = _shortTermEnergy;
             lufsEnergy = _lufsEnergy;
+            fastLufsEnergy = _fastLufsEnergy;
             lufsEnergyLeft = _lufsEnergyLeft;
             lufsEnergyRight = _lufsEnergyRight;
             rmsEnergyLeft = _rmsEnergyLeft;
@@ -1779,6 +2355,7 @@ internal sealed class AnalysisEngine
         _snapshot.Generation = generation;
         _snapshot.ShortTermDb = shortDb;
         _snapshot.MomentaryLufs = lufsEnergy > 1e-10 ? -0.691 + 10 * Math.Log10(lufsEnergy) : -100;
+        _snapshot.FastLufs = fastLufsEnergy > 1e-10 ? -0.691 + 10 * Math.Log10(fastLufsEnergy) : -100;
         _snapshot.LufsLeft = lufsEnergyLeft > 1e-10 ? -0.691 + 10 * Math.Log10(lufsEnergyLeft) : -100;
         _snapshot.LufsRight = lufsEnergyRight > 1e-10 ? -0.691 + 10 * Math.Log10(lufsEnergyRight) : -100;
         _snapshot.RmsLeftDb = ToDb(Math.Sqrt(rmsEnergyLeft));
@@ -1797,11 +2374,14 @@ internal sealed class AnalysisEngine
             Array.Clear(_right);
             _writePosition = 0;
             _totalFrames = 0;
+            _sinceLastCapture.Reset(); // no silence filling until a device delivers audio again
+            _silenceFramesAdded = 0;
             _generation++;
             _snapshotGeneration = -1;
             _snapshot.HasSignal = false;
             _shortTermEnergy = 0;
             _lufsEnergy = 0;
+            _fastLufsEnergy = 0;
             _lufsEnergyLeft = 0;
             _lufsEnergyRight = 0;
             _rmsEnergyLeft = 0;
@@ -1826,6 +2406,7 @@ internal sealed class AnalysisEngine
         _lufsHighPass = BuildHighPass(sampleRate, 38.13547087602444, 0.5003270373238773);
         Array.Clear(_lufsFilterState);
         _lufsEnergy = 0;
+        _fastLufsEnergy = 0;
         ClearShortTerm();
         _lufsFilterSampleRate = sampleRate;
     }
@@ -1844,35 +2425,28 @@ internal sealed class AnalysisEngine
         return output;
     }
 
-    private static BiquadCoefficients BuildHighShelf(int sampleRate, double frequency, double gainDb, double slope)
+    // ITU-R BS.1770 K-weighting, using the bilinear-transform design of the EBU reference implementation
+    // (libebur128). At 48 kHz it reproduces the standard's published coefficients exactly, and it adapts
+    // correctly to 44.1 kHz, 96 kHz and other rates.
+    private static BiquadCoefficients BuildHighShelf(int sampleRate, double frequency, double gainDb, double q)
     {
-        var amplitude = Math.Pow(10, gainDb / 40);
-        var omega = 2 * Math.PI * frequency / sampleRate;
-        var cosine = Math.Cos(omega);
-        var sine = Math.Sin(omega);
-        var alpha = sine / 2 * Math.Sqrt((amplitude + 1 / amplitude) * (1 / slope - 1) + 2);
-        var beta = 2 * Math.Sqrt(amplitude) * alpha;
-        var a0 = (amplitude + 1) - (amplitude - 1) * cosine + beta;
+        var k = Math.Tan(Math.PI * frequency / sampleRate);
+        var vh = Math.Pow(10, gainDb / 20);
+        var vb = Math.Pow(vh, 0.4996667741545416);
+        var a0 = 1 + k / q + k * k;
         return new BiquadCoefficients(
-            amplitude * ((amplitude + 1) + (amplitude - 1) * cosine + beta) / a0,
-            -2 * amplitude * ((amplitude - 1) + (amplitude + 1) * cosine) / a0,
-            amplitude * ((amplitude + 1) + (amplitude - 1) * cosine - beta) / a0,
-            2 * ((amplitude - 1) - (amplitude + 1) * cosine) / a0,
-            ((amplitude + 1) - (amplitude - 1) * cosine - beta) / a0);
+            (vh + vb * k / q + k * k) / a0,
+            2 * (k * k - vh) / a0,
+            (vh - vb * k / q + k * k) / a0,
+            2 * (k * k - 1) / a0,
+            (1 - k / q + k * k) / a0);
     }
 
     private static BiquadCoefficients BuildHighPass(int sampleRate, double frequency, double q)
     {
-        var omega = 2 * Math.PI * frequency / sampleRate;
-        var cosine = Math.Cos(omega);
-        var alpha = Math.Sin(omega) / (2 * q);
-        var a0 = 1 + alpha;
-        return new BiquadCoefficients(
-            (1 + cosine) / (2 * a0),
-            -(1 + cosine) / a0,
-            (1 + cosine) / (2 * a0),
-            -2 * cosine / a0,
-            (1 - alpha) / a0);
+        var k = Math.Tan(Math.PI * frequency / sampleRate);
+        var a0 = 1 + k / q + k * k;
+        return new BiquadCoefficients(1, -2, 1, 2 * (k * k - 1) / a0, (1 - k / q + k * k) / a0);
     }
 
     private static double ToDb(double value) => value > 1e-7 ? 20 * Math.Log10(value) : -100;
@@ -1955,10 +2529,15 @@ internal sealed class MeterChart : Control
     private const double MinFrequency = 20;
     private const double MaxFrequency = 20000;
     private const int WaveformHistory = 4096;
-    private const double VuReferenceLufs = -9; // 0 VU = -9 LUFS short-term (loud modern masters)
+    // The loudness meter's scale is EBU short-term loudness itself, in LUFS, evenly spaced in dB so the needle
+    // sits exactly on the value it reads. Above the -9 LUFS reference (loud modern masters) the scale turns red.
+    private const double VuReferenceLufs = -9;
+    private const double VuScaleMin = -30;
+    private const double VuScaleMax = 0;
+    private static readonly int[] VuMajorMarks = { -30, -24, -18, -15, -12, -9, -6, -3, 0 };
     private static readonly string[] NoteNames = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
 
-    private static readonly Color Ink = Palette.Ink;
+    private static Color Ink => Palette.Ink;
     private static readonly Pen GridPen = new(Palette.Grid, 1F);
     private static readonly Pen SpectrumPen = new(Palette.Accent, 1.2F);
     private static readonly Pen ScopePen = new(Palette.Secondary, 1F);
@@ -1966,6 +2545,8 @@ internal sealed class MeterChart : Control
     private static readonly Pen VuInkPen = new(Ink, 2.4F);
     private static readonly Pen VuRedPen = new(Palette.Over, 2.4F);
     private static readonly Pen VuBaselinePen = new(Ink, 2F);
+    private static readonly Pen VuMinorPen = new(Color.FromArgb(150, Ink), 1.2F);
+    private static readonly Pen VuRedMinorPen = new(Color.FromArgb(170, Palette.Over), 1.2F);
     private static readonly Pen NeedlePen = new(Palette.Needle, 2.2F);
     private static readonly SolidBrush InkBrush = new(Ink);
     private static readonly SolidBrush LabelBrush = new(Palette.Label);
@@ -1974,13 +2555,56 @@ internal sealed class MeterChart : Control
     private static readonly SolidBrush BoxBrush = new(Palette.Box);
     private static readonly SolidBrush VectorBrush = new(Color.FromArgb(160, Palette.Accent));
     private static readonly SolidBrush VuRedBrush = new(Palette.Over);
+    private static readonly SolidBrush LevelBrush = new(Palette.Secondary);
+    private static readonly Pen ScaleTickPen = new(Palette.Label, 1F);
     private static readonly Font SmallFont = new(UiFonts.Numbers, 7F);
     private static readonly Font ValueFont = new(UiFonts.Numbers, 8.5F);
     private static readonly int[] InfernoLut = BuildInfernoLut();
 
+    static MeterChart() => Palette.Changed += RefreshThemeStyles;
+
+    /// <summary>Re-colours the shared pens, brushes and spectrogram colour table for the active theme.</summary>
+    private static void RefreshThemeStyles()
+    {
+        GridPen.Color = Palette.Grid;
+        SpectrumPen.Color = Palette.Accent;
+        ScopePen.Color = Palette.Secondary;
+        HoverPen.Color = Color.FromArgb(80, Palette.Accent);
+        VuInkPen.Color = Ink;
+        VuRedPen.Color = Palette.Over;
+        VuBaselinePen.Color = Ink;
+        VuMinorPen.Color = Color.FromArgb(150, Ink);
+        VuRedMinorPen.Color = Color.FromArgb(170, Palette.Over);
+        NeedlePen.Color = Palette.Needle;
+        InkBrush.Color = Ink;
+        LabelBrush.Color = Palette.Label;
+        AccentBrush.Color = Palette.Accent;
+        TrackBrush.Color = Palette.Track;
+        BoxBrush.Color = Palette.Box;
+        VectorBrush.Color = Color.FromArgb(160, Palette.Accent);
+        VuRedBrush.Color = Palette.Over;
+        LevelBrush.Color = Palette.Secondary;
+        ScaleTickPen.Color = Palette.Label;
+        Array.Copy(BuildInfernoLut(), InfernoLut, InfernoLut.Length);
+    }
+
+    /// <summary>
+    /// Called after the theme changes. The spectrogram and waveform keep their history as finished colours, so
+    /// they are cleared and redraw in the new theme within a few seconds; everything else just repaints.
+    /// </summary>
+    public void OnThemeChanged()
+    {
+        if (_spectrogramPixels.Length > 0)
+        {
+            Array.Fill(_spectrogramPixels, unchecked((int)0xFF000000));
+            FlushSpectrogram();
+        }
+        _waveCount = 0;
+        Invalidate();
+    }
+
     private readonly ChartKind _kind;
     private AnalysisSnapshot _snapshot = new();
-    private DateTime _lastInvalidation = DateTime.MinValue;
     private bool _hasHistory;
 
     private Bitmap? _spectrogramBitmap;
@@ -1998,6 +2622,8 @@ internal sealed class MeterChart : Control
     private bool _hasSmoothedSpectrum;
     private Point? _hover;
     private double _needleVu = -40;
+    private double _needleAmplitude;
+    private double _needleVelocity;
     private DateTime _lastNeedleUpdate = DateTime.MinValue;
 
     public MeterChart(ChartKind kind)
@@ -2014,15 +2640,17 @@ internal sealed class MeterChart : Control
         var now = DateTime.UtcNow;
         if (snapshot.HasSignal)
         {
-            if (_kind == ChartKind.Spectrogram && (now - _lastSpectrogramRow).TotalMilliseconds >= 25)
+            // Both scroll at a fixed speed in real time, independent of the frame rate: each frame adds however
+            // many rows/columns of time have passed since the last one.
+            if (_kind == ChartKind.Spectrogram)
             {
-                AppendSpectrogramRow(snapshot);
-                _lastSpectrogramRow = now;
+                var rows = Steps(ref _lastSpectrogramRow, ref _spectrogramCarry, now, SpectrogramRowMilliseconds, 64);
+                if (rows > 0) AppendSpectrogramRows(snapshot, rows);
             }
-            else if (_kind == ChartKind.Waveform && (now - _lastWaveColumn).TotalMilliseconds >= 15)
+            else if (_kind == ChartKind.Waveform)
             {
-                AppendWaveColumn(snapshot);
-                _lastWaveColumn = now;
+                var columns = Steps(ref _lastWaveColumn, ref _waveCarry, now, WaveColumnMilliseconds, 128);
+                if (columns > 0) AppendWaveColumns(snapshot, columns);
             }
         }
         else if (_hasHistory)
@@ -2037,12 +2665,7 @@ internal sealed class MeterChart : Control
             }
         }
 
-        var interval = _kind switch { ChartKind.Spectrogram or ChartKind.Vectorscope => 25, _ => 7 };
-        if ((now - _lastInvalidation).TotalMilliseconds >= interval)
-        {
-            _lastInvalidation = now;
-            Invalidate();
-        }
+        Invalidate(); // the window's frame clock paces this
     }
 
     protected override void WndProc(ref Message m)
@@ -2051,10 +2674,55 @@ internal sealed class MeterChart : Control
         base.WndProc(ref m);
     }
 
+    public ChartKind Kind => _kind;
+
+    // ---------- Grip for rearranging panels ----------
+    // Shown in the top-left corner while the pointer is over the panel. It sits below the 8 px band that reveals
+    // the top bar, so reaching for it doesn't pop the bar open over it.
+    private static readonly Rectangle GripBounds = new(8, 12, 24, 17);
+    private bool _pointerInside;
+    private bool _pointerOnGrip;
+    private bool _dragging;
+
+    public bool IsOverGrip(Point point) => GripBounds.Contains(point);
+
+    public bool Dragging
+    {
+        get => _dragging;
+        set
+        {
+            _dragging = value;
+            Cursor = value ? Cursors.SizeAll : DefaultCursorFor(_pointerOnGrip);
+            Invalidate();
+        }
+    }
+
+    private Cursor DefaultCursorFor(bool onGrip) =>
+        onGrip ? Cursors.SizeAll : _kind == ChartKind.Spectrum ? Cursors.Cross : Cursors.Default;
+
+    protected override void OnMouseEnter(EventArgs e)
+    {
+        base.OnMouseEnter(e);
+        _pointerInside = true;
+        Invalidate(GripBounds);
+    }
+
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        if (_kind != ChartKind.Spectrum) return;
+        var onGrip = IsOverGrip(e.Location);
+        if (onGrip != _pointerOnGrip)
+        {
+            _pointerOnGrip = onGrip;
+            if (!_dragging) Cursor = DefaultCursorFor(onGrip);
+            Invalidate(GripBounds);
+        }
+        if (!_pointerInside)
+        {
+            _pointerInside = true;
+            Invalidate(GripBounds);
+        }
+        if (_kind != ChartKind.Spectrum || _dragging) return;
         _hover = e.Location;
         Invalidate();
     }
@@ -2062,9 +2730,45 @@ internal sealed class MeterChart : Control
     protected override void OnMouseLeave(EventArgs e)
     {
         base.OnMouseLeave(e);
+        _pointerInside = false;
+        _pointerOnGrip = false;
+        Invalidate(GripBounds);
         if (_hover is null) return;
         _hover = null;
         Invalidate();
+    }
+
+    private void DrawGripAndDragState(Graphics graphics)
+    {
+        var rect = ClientRectangle;
+        if (_dragging)
+        {
+            // The panel being moved: a soft mint wash and outline.
+            using (var wash = new SolidBrush(Color.FromArgb(22, Palette.Accent)))
+                graphics.FillRectangle(wash, rect);
+            using var outline = new Pen(Palette.Accent, 2F);
+            graphics.DrawRectangle(outline, 1, 1, rect.Width - 2, rect.Height - 2);
+        }
+        if (!_pointerInside && !_dragging) return;
+
+        var smoothing = graphics.SmoothingMode;
+        graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        var active = _pointerOnGrip || _dragging;
+        using (var path = RoundedBox(new RectangleF(GripBounds.X + 0.5f, GripBounds.Y + 0.5f, GripBounds.Width - 1, GripBounds.Height - 1), 4f))
+        {
+            using (var fill = new SolidBrush(Color.FromArgb(230, active ? Palette.Hover : Palette.Box)))
+                graphics.FillPath(fill, path);
+            using var border = new Pen(active ? Palette.Accent : Palette.Line);
+            graphics.DrawPath(border, path);
+        }
+        // Six-dot grip.
+        using var dots = new SolidBrush(active ? Palette.Accent : Palette.Label);
+        var cx = GripBounds.X + GripBounds.Width / 2f;
+        var cy = GripBounds.Y + GripBounds.Height / 2f;
+        for (var row = -1; row <= 1; row++)
+            for (var col = -1; col <= 1; col += 2)
+                graphics.FillEllipse(dots, cx + col * 2.6f - 1.4f, cy + row * 4f - 1.4f, 2.8f, 2.8f);
+        graphics.SmoothingMode = smoothing;
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -2085,6 +2789,7 @@ internal sealed class MeterChart : Control
             case ChartKind.Oscilloscope: DrawOscilloscope(graphics, rect, snapshot); break;
             case ChartKind.Spectrum: DrawSpectrum(graphics, rect, snapshot); break;
         }
+        DrawGripAndDragState(graphics);
     }
 
     protected override void Dispose(bool disposing)
@@ -2095,7 +2800,35 @@ internal sealed class MeterChart : Control
 
     // ---------- Spectrogram (log-frequency waterfall, newest row at the bottom) ----------
 
-    private void AppendSpectrogramRow(AnalysisSnapshot snapshot)
+    // Scroll speeds: how much time one spectrogram row / one waveform column stands for. Smaller = faster scrolling
+    // and a shorter stretch of time on screen (about 1.4 s and 1.3 s in the default strip).
+    private const double SpectrogramRowMilliseconds = 10;
+    private const double WaveColumnMilliseconds = 6;
+    private double _spectrogramCarry;
+    private double _waveCarry;
+
+    /// <summary>How many fixed-length steps of time have passed since the last call (the remainder carries over).</summary>
+    private static int Steps(ref DateTime last, ref double carry, DateTime now, double stepMilliseconds, int max)
+    {
+        if (last == DateTime.MinValue)
+        {
+            last = now;
+            carry = 0;
+            return 1;
+        }
+        carry += (now - last).TotalMilliseconds;
+        last = now;
+        var steps = (int)(carry / stepMilliseconds);
+        carry -= steps * stepMilliseconds;
+        if (steps > max)
+        {
+            steps = max; // after a stall (window dragged, PC busy) don't try to catch up
+            carry = 0;
+        }
+        return steps;
+    }
+
+    private void AppendSpectrogramRows(AnalysisSnapshot snapshot, int rows)
     {
         var width = Math.Max(1, ClientSize.Width);
         var height = Math.Max(1, ClientSize.Height);
@@ -2107,7 +2840,9 @@ internal sealed class MeterChart : Control
             Array.Fill(_spectrogramPixels, unchecked((int)0xFF000000));
         }
 
-        Array.Copy(_spectrogramPixels, width, _spectrogramPixels, 0, width * (height - 1));
+        // The spectrum is analysed once per frame, so the new rows for this frame share it.
+        rows = Math.Min(rows, height);
+        Array.Copy(_spectrogramPixels, width * rows, _spectrogramPixels, 0, width * (height - rows));
         var row = width * (height - 1);
         var binWidth = BinWidth(snapshot);
         for (var x = 0; x < width; x++)
@@ -2116,6 +2851,8 @@ internal sealed class MeterChart : Control
             var level = Math.Pow(Math.Clamp((db + 92) / 80, 0, 1), 1.8);
             _spectrogramPixels[row + x] = InfernoLut[(int)(level * 255)];
         }
+        for (var r = 1; r < rows; r++)
+            Array.Copy(_spectrogramPixels, row, _spectrogramPixels, row - r * width, width);
         FlushSpectrogram();
         _hasHistory = true;
     }
@@ -2149,14 +2886,35 @@ internal sealed class MeterChart : Control
 
     // ---------- Colored scrolling waveform (hue follows the spectral centre) ----------
 
-    private void AppendWaveColumn(AnalysisSnapshot snapshot)
+    /// <summary>
+    /// Adds <paramref name="columns"/> waveform columns, each the peak of its own slice of the newest audio
+    /// (one column = <see cref="WaveColumnMilliseconds"/>), so faster scrolling shows real detail, not stretched copies.
+    /// </summary>
+    private void AppendWaveColumns(AnalysisSnapshot snapshot, int columns)
     {
-        var count = Math.Min(1024, snapshot.Left.Length);
-        var start = snapshot.Left.Length - count;
-        var peak = 0f;
-        for (var i = start; i < snapshot.Left.Length; i++)
-            peak = Math.Max(peak, Math.Max(Math.Abs(snapshot.Left[i]), Math.Abs(snapshot.Right[i])));
+        var length = snapshot.Left.Length;
+        if (length == 0) return;
+        var sampleRate = snapshot.SampleRate > 0 ? snapshot.SampleRate : 48000;
+        var perColumn = Math.Max(1, (int)(sampleRate * WaveColumnMilliseconds / 1000));
+        columns = Math.Min(columns, Math.Max(1, length / perColumn));
+        var color = WaveColumnColor(snapshot);
+        for (var column = 0; column < columns; column++)
+        {
+            var end = length - (columns - 1 - column) * perColumn;
+            var peak = 0f;
+            for (var i = Math.Max(0, end - perColumn); i < end; i++)
+                peak = Math.Max(peak, Math.Max(Math.Abs(snapshot.Left[i]), Math.Abs(snapshot.Right[i])));
+            _wavePeaks[_waveWrite] = Math.Min(1f, peak);
+            _waveColors[_waveWrite] = WaveColor(color, peak);
+            _waveWrite = (_waveWrite + 1) % WaveformHistory;
+            _waveCount = Math.Min(_waveCount + 1, WaveformHistory);
+        }
+        _hasHistory = true;
+    }
 
+    /// <summary>Where the sound's brightness sits (0 = bass-heavy … 1 = bright), from the spectral centre.</summary>
+    private static double WaveColumnColor(AnalysisSnapshot snapshot)
+    {
         var binWidth = BinWidth(snapshot);
         double weighted = 0, total = 0;
         var first = Math.Max(1, (int)(30 / binWidth));
@@ -2168,14 +2926,7 @@ internal sealed class MeterChart : Control
             total += magnitude;
         }
         var centroid = total > 1e-9 ? weighted / total : Math.Log2(1000);
-        var hue = Math.Clamp((centroid - Math.Log2(150)) / (Math.Log2(6000) - Math.Log2(150)), 0, 1) * 275;
-        var saturation = Math.Clamp(0.9 - peak * 0.6, 0.15, 0.9);
-
-        _wavePeaks[_waveWrite] = Math.Min(1f, peak);
-        _waveColors[_waveWrite] = WaveColor(hue / 275, peak);
-        _waveWrite = (_waveWrite + 1) % WaveformHistory;
-        _waveCount = Math.Min(_waveCount + 1, WaveformHistory);
-        _hasHistory = true;
+        return Math.Clamp((centroid - Math.Log2(150)) / (Math.Log2(6000) - Math.Log2(150)), 0, 1);
     }
 
     private void DrawWaveform(Graphics graphics, Rectangle rect)
@@ -2196,7 +2947,43 @@ internal sealed class MeterChart : Control
 
     // ---------- LUFS bars ----------
 
-    private static void DrawLufsMeter(Graphics graphics, Rectangle rect, AnalysisSnapshot snapshot)
+    // ---------- Level (dB) + loudness (LUFS) bars ----------
+    // Left bar: sample-peak level in dBFS, PPM-style (instant rise, falls 20 dB/s) with a peak-hold line.
+    // Right bar: momentary loudness in LUFS. Both share the 0 to -54 scale on the left.
+    private const double PeakFallDbPerSecond = 20;
+    private const double PeakHoldSeconds = 1.5;
+    private const double PeakWarningDb = -3; // the dB bar turns to the warning colour above this
+    private double _peakDb = -100;
+    private double _peakHoldDb = -100;
+    private DateTime _peakHoldUntil = DateTime.MinValue;
+    private DateTime _lastPeakUpdate = DateTime.MinValue;
+
+    /// <summary>Sample peak (dBFS) of the audio that arrived since the last frame, with meter ballistics.</summary>
+    private double UpdatePeak(AnalysisSnapshot snapshot)
+    {
+        var now = DateTime.UtcNow;
+        var elapsed = _lastPeakUpdate == DateTime.MinValue ? 0.02 : Math.Clamp((now - _lastPeakUpdate).TotalSeconds, 0.001, 0.25);
+        _lastPeakUpdate = now;
+        var current = -100.0;
+        if (snapshot.HasSignal && snapshot.Left.Length > 0)
+        {
+            var sampleRate = snapshot.SampleRate > 0 ? snapshot.SampleRate : 48000;
+            var count = Math.Clamp((int)(sampleRate * elapsed) + 64, 64, snapshot.Left.Length);
+            var peak = 0f;
+            for (var i = snapshot.Left.Length - count; i < snapshot.Left.Length; i++)
+                peak = Math.Max(peak, Math.Max(Math.Abs(snapshot.Left[i]), Math.Abs(snapshot.Right[i])));
+            current = peak > 1e-6f ? 20 * Math.Log10(peak) : -100;
+        }
+        _peakDb = Math.Max(current, _peakDb - PeakFallDbPerSecond * elapsed);
+        if (_peakDb >= _peakHoldDb || now >= _peakHoldUntil)
+        {
+            _peakHoldDb = _peakDb;
+            _peakHoldUntil = now.AddSeconds(PeakHoldSeconds);
+        }
+        return _peakDb;
+    }
+
+    private void DrawLufsMeter(Graphics graphics, Rectangle rect, AnalysisSnapshot snapshot)
     {
         graphics.SmoothingMode = SmoothingMode.None;
         const double range = 54;
@@ -2204,34 +2991,59 @@ internal sealed class MeterChart : Control
         var bottom = rect.Bottom - 6f;
         float Y(double db) => top + (float)(Math.Clamp(-db, 0, range) / range) * (bottom - top);
 
-        // Centre the scale + bars + readout when the panel is wider than they need (vertical layout).
-        var contentWidth = 22f + 4 + 8 * 2 + 3 + 4 + graphics.MeasureString("-88.8 LUFS", ValueFont).Width + 8;
-        var labelRight = rect.Left + Math.Max(0, (rect.Width - contentWidth) / 2) + 22f;
+        // Centre the scale + bars + readouts when the panel is wider than they need (vertical layout).
+        const float labelWidth = 12f, tickWidth = 5f, barWidth = 7f, gap = 2f;
+        var contentWidth = labelWidth + 2 + tickWidth + 2 + barWidth * 2 + gap + 3 + graphics.MeasureString("-88.8 LUFS", ValueFont).Width + 8;
+        var labelRight = rect.Left + 2 + Math.Max(0, (rect.Width - contentWidth) / 2) + labelWidth;
+        var tickLeft = labelRight + 2;
+        var barX = tickLeft + tickWidth + 2;
+
+        // Scale: numbers with a tick line beside each, and short minor ticks every 3 dB in between.
+        for (var db = 0; db <= (int)range; db += 3)
+        {
+            var y = (float)Math.Round(Y(-db)) + 0.5f;
+            graphics.DrawLine(GridPen, tickLeft + tickWidth - 2, y, tickLeft + tickWidth, y);
+        }
         foreach (var mark in new[] { 0, 6, 12, 24, 36, 50 })
         {
+            var y = (float)Math.Round(Y(-mark)) + 0.5f;
+            graphics.DrawLine(ScaleTickPen, tickLeft, y, tickLeft + tickWidth, y);
             var text = mark.ToString();
             var size = graphics.MeasureString(text, SmallFont);
-            graphics.DrawString(text, SmallFont, LabelBrush, labelRight - size.Width, Y(-mark) - size.Height / 2);
+            graphics.DrawString(text, SmallFont, LabelBrush, labelRight - size.Width, y - size.Height / 2);
         }
 
-        const float barWidth = 8f;
-        const float gap = 3f;
-        var barX = labelRight + 4;
-        void Bar(float x, double level)
+        // Left: peak level in dB.
+        var peakDb = UpdatePeak(snapshot);
+        graphics.FillRectangle(TrackBrush, barX, top, barWidth, bottom - top);
+        if (snapshot.HasSignal && peakDb > -range)
         {
-            graphics.FillRectangle(TrackBrush, x, top, barWidth, bottom - top);
-            if (!snapshot.HasSignal || level <= -range) return;
-            var y = Y(level);
-            graphics.FillRectangle(AccentBrush, x, y, barWidth, bottom - y);
+            var y = Y(peakDb);
+            var warnY = Y(PeakWarningDb);
+            graphics.FillRectangle(LevelBrush, barX, Math.Max(y, warnY), barWidth, bottom - Math.Max(y, warnY));
+            if (y < warnY) graphics.FillRectangle(VuRedBrush, barX, y, barWidth, warnY - y);
         }
-        Bar(barX, snapshot.LufsLeft);
-        Bar(barX + barWidth + gap, snapshot.LufsRight);
+        if (snapshot.HasSignal && _peakHoldDb > -range)
+        {
+            var holdY = Y(_peakHoldDb);
+            graphics.FillRectangle(_peakHoldDb > PeakWarningDb ? VuRedBrush : InkBrush, barX, holdY - 1, barWidth, 2);
+        }
 
+        // Right: momentary loudness in LUFS.
+        var lufsX = barX + barWidth + gap;
         var lufs = snapshot.HasSignal ? snapshot.MomentaryLufs : -100;
-        var readout = lufs > -100 ? $"{lufs:0.0} LUFS" : "-inf LUFS";
-        var readoutSize = graphics.MeasureString(readout, ValueFont);
-        var boxY = Math.Clamp(Y(lufs) - readoutSize.Height / 2, top, Math.Max(top, bottom - readoutSize.Height - 2));
-        DrawValueBox(graphics, readout, ValueFont, barX + barWidth * 2 + gap + 4, boxY);
+        graphics.FillRectangle(TrackBrush, lufsX, top, barWidth, bottom - top);
+        if (snapshot.HasSignal && lufs > -range)
+        {
+            var y = Y(lufs);
+            graphics.FillRectangle(AccentBrush, lufsX, y, barWidth, bottom - y);
+        }
+
+        // Readout: the LUFS value, level with the top of the loudness bar (the dB bar speaks for itself).
+        var lufsText = lufs > -100 ? $"{lufs:0.0} LUFS" : "-inf LUFS";
+        var boxHeight = graphics.MeasureString(lufsText, ValueFont).Height + 2;
+        var lufsY = Math.Clamp(Y(lufs) - boxHeight / 2, top, Math.Max(top, bottom - boxHeight - 2));
+        DrawValueBox(graphics, lufsText, ValueFont, lufsX + barWidth + 3, lufsY);
     }
 
     // ---------- Vectorscope ----------
@@ -2258,17 +3070,22 @@ internal sealed class MeterChart : Control
 
     // ---------- Analog VU meter ----------
 
-    private static double VuPosition(double vu) => Math.Pow(10, vu / 20) / 1.4125;
+    /// <summary>Position along the arc (0 = left end, 1 = right end) for a short-term loudness in LUFS.</summary>
+    private static double VuPosition(double lufs) => (lufs - VuScaleMin) / (VuScaleMax - VuScaleMin);
 
     private void DrawVuMeter(Graphics graphics, Rectangle rect, AnalysisSnapshot snapshot)
     {
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        var h = (float)rect.Height;
+        // Everything (arc, ticks, labels, needle, readouts) is sized from one gauge height "h", limited by the
+        // panel's width as well as its height, so the meter keeps its proportions in tall or narrow panels.
+        // In a panel taller than that, the gauge is centred vertically.
         const double halfSpan = 24 * Math.PI / 180;
-        var halfWidth = Math.Max(20f, Math.Min(rect.Width * 0.42f, h * 1.15f));
+        var h = Math.Max(24f, Math.Min(rect.Height, rect.Width * 0.52f));
+        var gauge = new RectangleF(rect.Left, rect.Top + (rect.Height - h) / 2f, rect.Width, h);
+        var halfWidth = Math.Max(20f, Math.Min(rect.Width * 0.38f, h * 1.15f)); // leaves room for the 30 and 0 labels
         var radius = (float)(halfWidth / Math.Sin(halfSpan));
         var centerX = rect.Left + rect.Width / 2f;
-        var arcY = rect.Top + h * 0.38f;
+        var arcY = gauge.Top + h * 0.38f;
         var pivotY = arcY + radius;
 
         PointF At(double position, float distance)
@@ -2278,28 +3095,36 @@ internal sealed class MeterChart : Control
         }
         float GdiAngle(double position) => (float)((-halfSpan + position * 2 * halfSpan) * 180 / Math.PI - 90);
 
-        var zero = VuPosition(0);
+        // Red band from the -9 LUFS reference to 0 LUFS; plain baseline below it.
+        var reference = VuPosition(VuReferenceLufs);
         using (var band = new GraphicsPath())
         {
             var outer = radius + h * 0.035f;
             var inner = radius - h * 0.035f;
-            var a0 = GdiAngle(zero);
+            var a0 = GdiAngle(reference);
             var a1 = GdiAngle(1);
             band.AddArc(centerX - outer, pivotY - outer, outer * 2, outer * 2, a0, a1 - a0);
             band.AddArc(centerX - inner, pivotY - inner, inner * 2, inner * 2, a1, a0 - a1);
             band.CloseFigure();
             graphics.FillPath(VuRedBrush, band);
         }
-        var start = VuPosition(-20);
-        graphics.DrawArc(VuBaselinePen, centerX - radius, pivotY - radius, radius * 2, radius * 2, GdiAngle(start), GdiAngle(zero) - GdiAngle(start));
+        graphics.DrawArc(VuBaselinePen, centerX - radius, pivotY - radius, radius * 2, radius * 2, GdiAngle(0), GdiAngle(reference) - GdiAngle(0));
+
+        // Minor ticks every 1 LU just inside the arc.
+        for (var lufs = (int)VuScaleMin; lufs <= (int)VuScaleMax; lufs++)
+        {
+            var position = VuPosition(lufs);
+            var minorPen = lufs > VuReferenceLufs ? VuRedMinorPen : VuMinorPen;
+            graphics.DrawLine(minorPen, At(position, radius - h * 0.02f), At(position, radius - h * (lufs % 3 == 0 ? 0.075f : 0.05f)));
+        }
 
         var fontPx = Math.Clamp(h * 0.12f, 9f, 20f);
         using var scaleFont = new Font(UiFonts.Numbers, fontPx, FontStyle.Regular, GraphicsUnit.Pixel);
-        using var percentFont = new Font(UiFonts.Numbers, fontPx * 0.72f, FontStyle.Regular, GraphicsUnit.Pixel);
-        foreach (var mark in new[] { -20, -10, -7, -5, -4, -3, -2, -1, 0, 1, 2, 3 })
+        using var unitFont = new Font(UiFonts.Small, fontPx * 0.62f, FontStyle.Bold, GraphicsUnit.Pixel);
+        foreach (var mark in VuMajorMarks)
         {
             var position = VuPosition(mark);
-            var red = mark > 0;
+            var red = mark > VuReferenceLufs;
             graphics.DrawLine(red ? VuRedPen : VuInkPen, At(position, radius), At(position, radius + h * 0.13f));
             var label = Math.Abs(mark).ToString();
             var point = At(position, radius + h * 0.23f);
@@ -2307,35 +3132,42 @@ internal sealed class MeterChart : Control
             graphics.DrawString(label, scaleFont, red ? VuRedBrush : InkBrush, point.X - size.Width / 2, point.Y - size.Height / 2);
         }
 
-        for (var percent = 0; percent <= 100; percent += 20)
-        {
-            var position = percent / 100.0 * zero;
-            var dot = At(position, radius - h * 0.11f);
-            graphics.FillEllipse(InkBrush, dot.X - 2, dot.Y - 2, 4, 4);
-            var label = percent.ToString();
-            var point = At(position, radius - h * 0.21f);
-            var size = graphics.MeasureString(label, percentFont);
-            graphics.DrawString(label, percentFont, InkBrush, point.X - size.Width / 2, point.Y - size.Height / 2);
-        }
+        // Unit caption under the middle of the arc, so the scale is unambiguous.
+        const string unit = "−LUFS-S";
+        var unitPoint = At(0.5, radius - h * 0.16f);
+        var unitSize = graphics.MeasureString(unit, unitFont);
+        graphics.DrawString(unit, unitFont, LabelBrush, unitPoint.X - unitSize.Width / 2, unitPoint.Y - unitSize.Height / 2);
 
         // Readouts: short-term loudness on the left, distance from the 0 VU reference on the right.
         var shortTerm = snapshot.HasSignal ? snapshot.ShortTermLufs : -100;
         var hasLoudness = shortTerm > -100;
         var leftText = hasLoudness ? $"{shortTerm:0.0} LUFS-S" : "-inf LUFS-S";
         var rightText = hasLoudness ? $"{shortTerm - VuReferenceLufs:+0.0;-0.0} LU" : "-- LU";
-        var boxY = rect.Bottom - ValueFont.Height - 6f;
+        var boxY = gauge.Bottom - ValueFont.Height - 6f;
         DrawValueBox(graphics, leftText, ValueFont, rect.Left + 6, boxY);
         DrawValueBox(graphics, rightText, ValueFont, rect.Right - 6, boxY, true);
 
-        // Needle ballistics: ease toward the target (~300 ms), like an analog movement.
-        var target = hasLoudness ? shortTerm - VuReferenceLufs : -40;
+        // Needle: a classic VU movement. It is driven by fast (25 ms) K-weighted loudness and has mass and damping
+        // like the real thing (settles in ~300 ms with ~1.5 % overshoot), so it swings with the beat. It works on
+        // signal amplitude, as a moving coil does, then is shown on the LUFS scale; a steady sound settles exactly
+        // on its LUFS value. The readout boxes still show short-term LUFS.
+        var drive = snapshot.HasSignal && snapshot.FastLufs > -100 ? Math.Pow(10, (snapshot.FastLufs + 0.691) / 20) : 0;
         var now = DateTime.UtcNow;
-        var elapsed = _lastNeedleUpdate == DateTime.MinValue ? 1 : Math.Min(1, (now - _lastNeedleUpdate).TotalSeconds);
+        var elapsed = _lastNeedleUpdate == DateTime.MinValue ? 0.016 : Math.Min(0.25, (now - _lastNeedleUpdate).TotalSeconds);
         _lastNeedleUpdate = now;
-        _needleVu += (target - _needleVu) * (1 - Math.Exp(-elapsed / 0.3));
-        var needle = Math.Clamp(VuPosition(_needleVu), -0.02, 1.04);
+        const double omega = 18.9, damping = 0.81; // natural frequency (rad/s) and damping ratio of a VU movement
+        for (var remaining = elapsed; remaining > 0; remaining -= 0.002)
+        {
+            var dt = Math.Min(0.002, remaining);
+            var acceleration = omega * omega * (drive - _needleAmplitude) - 2 * damping * omega * _needleVelocity;
+            _needleVelocity += acceleration * dt;
+            _needleAmplitude += _needleVelocity * dt;
+            if (_needleAmplitude < 0) { _needleAmplitude = 0; _needleVelocity = 0; } // resting against the left stop
+        }
+        _needleVu = _needleAmplitude > 1e-6 ? -0.691 + 20 * Math.Log10(_needleAmplitude) : VuScaleMin - 6;
+        var needle = Math.Clamp(VuPosition(_needleVu), -0.03, 1.03);
         var state = graphics.Save();
-        graphics.SetClip(rect);
+        graphics.SetClip(gauge); // the needle's pivot sits below the gauge, as on a real meter
         graphics.DrawLine(NeedlePen, At(needle, 0), At(needle, radius + h * 0.2f));
         graphics.Restore(state);
     }
@@ -2536,26 +3368,16 @@ internal sealed class MeterChart : Control
         return Color.FromArgb((int)((r + m) * 255), (int)((g + m) * 255), (int)((b + m) * 255)).ToArgb();
     }
 
+    /// <summary>Spectrogram colour table (quiet to loud) from the active theme's colour ramp.</summary>
     private static int[] BuildInfernoLut()
     {
-        var stops = new[]
-        {
-            // "Deep sea": black, navy, blue, teal, mint, white.
-            (0, 0, 0), (4, 10, 26), (10, 22, 60), (20, 40, 104), (30, 70, 150), (28, 110, 170),
-            (30, 155, 172), (60, 200, 180), (112, 240, 200), (190, 252, 228), (255, 255, 255),
-        };
+        var stops = Palette.Theme.Spectrogram;
         var lut = new int[256];
         for (var i = 0; i < lut.Length; i++)
         {
             var scaled = i / 255.0 * (stops.Length - 1);
             var index = Math.Min(stops.Length - 2, (int)scaled);
-            var amount = scaled - index;
-            var (r0, g0, b0) = stops[index];
-            var (r1, g1, b1) = stops[index + 1];
-            lut[i] = Color.FromArgb(
-                (int)(r0 + (r1 - r0) * amount),
-                (int)(g0 + (g1 - g0) * amount),
-                (int)(b0 + (b1 - b0) * amount)).ToArgb();
+            lut[i] = Palette.Mix(stops[index], stops[index + 1], scaled - index).ToArgb();
         }
         return lut;
     }
