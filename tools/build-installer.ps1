@@ -1,3 +1,10 @@
+﻿# SPECTRM - real-time audio meter for Windows
+# Copyright (C) 2026 shiroiidesu
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# This program is free software: you can redistribute it and/or modify it under the terms of the GNU General
+# Public License as published by the Free Software Foundation, either version 3 of the License, or (at your
+# option) any later version. It is distributed WITHOUT ANY WARRANTY; see the LICENSE file for details.
 # Builds the single-file SPECTRM installer: dist\SPECTRM-Setup-<version>.exe
 #
 #   powershell -ExecutionPolicy Bypass -File tools\build-installer.ps1

@@ -19,6 +19,7 @@
     <Prefer32Bit>false</Prefer32Bit>
     <DebugType>none</DebugType>
     <Product>SPECTRM</Product>
+    <Copyright>Copyright (C) 2026 shiroiidesu. Licensed under GPL-3.0-or-later.</Copyright>
     <AssemblyTitle>SPECTRM Setup</AssemblyTitle>
     <Version>1.0.0</Version>
   </PropertyGroup>
@@ -29,5 +30,8 @@
     <Compile Include="..\Logo.cs" Link="Logo.cs" />
     <Compile Include="..\LogoData.cs" Link="LogoData.cs" />
     <EmbeddedResource Include="..\SPECTRM.ico" LogicalName="SPECTRM.ico" />
+    <!-- Written next to SPECTRM.exe on install: the GPL asks that the program comes with a copy of its license. -->
+    <EmbeddedResource Include="..\LICENSE" LogicalName="LICENSE.txt" />
+    <EmbeddedResource Include="..\THIRD-PARTY-NOTICES.md" LogicalName="THIRD-PARTY-NOTICES.txt" />
   </ItemGroup>
 </Project>

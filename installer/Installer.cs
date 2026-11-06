@@ -1,3 +1,10 @@
+﻿// SPECTRM - real-time audio meter for Windows
+// Copyright (C) 2026 shiroiidesu
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// This program is free software: you can redistribute it and/or modify it under the terms of the GNU General
+// Public License as published by the Free Software Foundation, either version 3 of the License, or (at your
+// option) any later version. It is distributed WITHOUT ANY WARRANTY; see the LICENSE file for details.
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -88,6 +95,7 @@ namespace Spectrm.Setup
                 File.Move(unpacked, exe);
             });
             payload.WriteStub(Path.Combine(dir, UninstallerName));
+            foreach (var name in LegalFiles) WriteResource(name, Path.Combine(dir, name));
 
             report(0.94f, "Creating shortcuts");
             UpdateShortcut(StartMenuLink, exe, choices.StartMenu);
@@ -108,6 +116,7 @@ namespace Spectrm.Setup
             var exe = Path.Combine(dir, ExeName);
             Retry(() => DeleteIfExists(exe));
             DeleteIfExists(exe + ".new");
+            foreach (var name in LegalFiles) DeleteIfExists(Path.Combine(dir, name));
             var uninstaller = Path.Combine(dir, UninstallerName);
             if (!string.Equals(Path.GetFullPath(uninstaller), Path.GetFullPath(SelfPath), StringComparison.OrdinalIgnoreCase))
                 Retry(() => DeleteIfExists(uninstaller));
@@ -125,6 +134,18 @@ namespace Spectrm.Setup
             }
             catch (IOException) { }
             report(1f, "Done");
+        }
+
+        /// <summary>License files embedded in the setup program and installed next to SPECTRM.exe.</summary>
+        private static readonly string[] LegalFiles = { "LICENSE.txt", "THIRD-PARTY-NOTICES.txt" };
+
+        private static void WriteResource(string name, string path)
+        {
+            using (var source = typeof(Installer).Assembly.GetManifestResourceStream(name))
+            {
+                if (source == null) return;
+                using (var output = File.Create(path)) source.CopyTo(output);
+            }
         }
 
         /// <summary>Closes SPECTRM if it is running from <paramref name="dir"/> (asks it to close first, then forces).</summary>

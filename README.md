@@ -45,3 +45,11 @@ To build it yourself, run `tools\build-installer.ps1`. It publishes the app and 
 ## Built with
 
 C# / .NET 7 Windows Forms and [NAudio](https://github.com/naudio/NAudio).
+
+## License
+
+SPECTRM is free and open source software, licensed under the [GNU General Public License v3.0](LICENSE) (or any later version).
+
+You're free to use it, study it, change it however you like, and share it, original or modified, even commercially. The one rule: if you share a modified version, it must stay open source under the GPL, with its source code available, so everyone else gets the same freedom.
+
+Third-party components and their licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

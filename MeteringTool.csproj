@@ -16,6 +16,7 @@
     <ApplicationIcon>SPECTRM.ico</ApplicationIcon>
     <Version>1.0.0</Version>
     <Product>SPECTRM</Product>
+    <Copyright>Copyright (C) 2026 shiroiidesu. Licensed under GPL-3.0-or-later.</Copyright>
   </PropertyGroup>
   <ItemGroup>
     <!-- The installer is its own project (installer\SpectrmSetup.csproj); keep its files out of the app. -->
