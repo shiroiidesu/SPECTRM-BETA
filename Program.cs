@@ -443,7 +443,7 @@ internal static class EdgePassThrough
         var point = form.PointToClient(new Point(unchecked((short)(packed & 0xFFFF)), unchecked((short)((packed >> 16) & 0xFFFF))));
         if (point.X >= EdgeSize && point.Y >= EdgeSize && point.X < form.ClientSize.Width - EdgeSize && point.Y < form.ClientSize.Height - EdgeSize)
             return false;
-        m.Result = (IntPtr)HtTransparent;
+        m.Result = HtTransparent;
         return true;
     }
 }
@@ -494,7 +494,6 @@ internal sealed class MeterWindow : Form
     private readonly BarButton _maximizeButton = new();
     private readonly BarButton _closeButton = new();
     private readonly ToolTip _statusTooltip = new();
-    private AnalysisSnapshot _snapshot = new();
     private int _targetFps;
     private long _lastDisplayedGeneration = -1;
     private DateTime _lastIdleRefresh = DateTime.MinValue;
@@ -975,7 +974,7 @@ internal sealed class MeterWindow : Form
         if (m.Msg == WmNcActivate)
         {
             ApplyBorderlessDwmStyle();
-            m.Result = (IntPtr)1;
+            m.Result = 1;
             return;
         }
 
@@ -1018,14 +1017,14 @@ internal sealed class MeterWindow : Form
                 var right = point.X >= ClientSize.Width - resizeBorder;
                 var top = point.Y < resizeBorder;
                 var bottom = point.Y >= ClientSize.Height - resizeBorder;
-                if (top && left) { m.Result = (IntPtr)HtTopLeft; return; }
-                if (top && right) { m.Result = (IntPtr)HtTopRight; return; }
-                if (bottom && left) { m.Result = (IntPtr)HtBottomLeft; return; }
-                if (bottom && right) { m.Result = (IntPtr)HtBottomRight; return; }
-                if (left) { m.Result = (IntPtr)HtLeft; return; }
-                if (right) { m.Result = (IntPtr)HtRight; return; }
-                if (top) { m.Result = (IntPtr)HtTop; return; }
-                if (bottom) { m.Result = (IntPtr)HtBottom; return; }
+                if (top && left) { m.Result = HtTopLeft; return; }
+                if (top && right) { m.Result = HtTopRight; return; }
+                if (bottom && left) { m.Result = HtBottomLeft; return; }
+                if (bottom && right) { m.Result = HtBottomRight; return; }
+                if (left) { m.Result = HtLeft; return; }
+                if (right) { m.Result = HtRight; return; }
+                if (top) { m.Result = HtTop; return; }
+                if (bottom) { m.Result = HtBottom; return; }
             }
 
             if (_topBar.Visible && _topBar.Bounds.Contains(point))
@@ -1033,7 +1032,7 @@ internal sealed class MeterWindow : Form
                 var barPoint = _topBar.PointToClient(screenPoint);
                 if (_topBar.GetChildAtPoint(barPoint) is not Button)
                 {
-                    m.Result = (IntPtr)HtCaption;
+                    m.Result = HtCaption;
                     return;
                 }
             }
@@ -1069,7 +1068,7 @@ internal sealed class MeterWindow : Form
         try
         {
             ReleaseCapture();
-            SendMessage(Handle, WmNcLButtonDown, (IntPtr)HtCaption, IntPtr.Zero);
+            SendMessage(Handle, WmNcLButtonDown, HtCaption, IntPtr.Zero);
         }
         finally
         {
@@ -1275,23 +1274,8 @@ internal sealed class MeterWindow : Form
         _settingsOverlay.Vertical = _vertical;
     }
 
-    private static void DrawBorder(Graphics graphics, Rectangle bounds, Color color, int radius)
-    {
-        bounds.Width -= 1;
-        bounds.Height -= 1;
-        using var path = new GraphicsPath();
-        var diameter = radius * 2;
-        path.AddArc(bounds.X, bounds.Y, diameter, diameter, 180, 90);
-        path.AddArc(bounds.Right - diameter, bounds.Y, diameter, diameter, 270, 90);
-        path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
-        path.AddArc(bounds.X, bounds.Bottom - diameter, diameter, diameter, 90, 90);
-        path.CloseFigure();
-        using var pen = new Pen(color);
-        graphics.DrawPath(pen, path);
-    }
-
     /// <summary>
-    /// Reads settings.txt: "key=value" lines (fps, layout, pinned). A file holding only a number is the
+    /// Reads settings.txt: "key=value" lines (fps, layout, pinned, order, theme). A file holding only a number is the
     /// older single-setting format and is read as the frame rate.
     /// </summary>
     private void LoadSettings()
@@ -1654,7 +1638,6 @@ internal sealed class MeterWindow : Form
             SetStatus($"OUTPUT ERROR: {_lastOutputError}");
         _analysis.FillSilenceIfStalled(); // so meters fall back when playback stops instead of freezing
         var snapshot = _analysis.GetSnapshot();
-        _snapshot = snapshot;
         if (!snapshot.HasSignal && _targetFps == 0)
         {
             var now = DateTime.UtcNow;
@@ -1769,7 +1752,6 @@ internal sealed class SettingsOverlay : Control
     private static Color TileSelected => Palette.Mix(Palette.Track, Palette.Box, 0.6);
     private static Color TileBorder => Palette.Line;
     private static Color TileBorderStrong => Palette.Mix(Palette.Line, Palette.Accent, 0.35);
-    private static readonly Font EyebrowFont = new(UiFonts.Small, 7.5F, FontStyle.Bold);
     private static readonly Font HeadingFont = new(UiFonts.Display, 15F, FontStyle.Bold);
     private static readonly Font HintFont = new(UiFonts.Small, 7.5F, FontStyle.Bold);
     private static readonly Font GroupFont = new(UiFonts.Small, 7F, FontStyle.Bold);
@@ -2139,17 +2121,11 @@ internal sealed class AnalysisSnapshot
     public float[] Left { get; set; } = Array.Empty<float>();
     public float[] Right { get; set; } = Array.Empty<float>();
     public float[] SpectrumDb { get; set; } = Array.Empty<float>();
-    public double ShortTermDb { get; set; } = -100;
     public double MomentaryLufs { get; set; } = -100;
     /// <summary>K-weighted loudness over ~25 ms (LUFS units): what the VU needle's movement follows.</summary>
     public double FastLufs { get; set; } = -100;
     public double ShortTermLufs { get; set; } = -100;
-    public double LufsLeft { get; set; } = -100;
-    public double LufsRight { get; set; } = -100;
-    public double RmsLeftDb { get; set; } = -100;
-    public double RmsRightDb { get; set; } = -100;
     public int SampleRate { get; set; }
-    public double Correlation { get; set; }
 }
 
 internal sealed class AnalysisEngine
@@ -2162,8 +2138,6 @@ internal sealed class AnalysisEngine
     private readonly object _gate = new();
     private readonly float[] _left = new float[RingSize];
     private readonly float[] _right = new float[RingSize];
-    private readonly float[] _analysisLeft = new float[FftSize];
-    private readonly float[] _analysisRight = new float[FftSize];
     private readonly float[] _combined = new float[FftSize];
     private readonly double[] _fftReal = new double[FftSize];
     private readonly double[] _fftImaginary = new double[FftSize];
@@ -2182,15 +2156,10 @@ internal sealed class AnalysisEngine
     private long _totalFrames;
     private long _generation;
     private long _snapshotGeneration = -1;
-    private double _shortTermEnergy;
     private double _lufsEnergy;
     // K-weighted loudness with only a 25 ms average: drives the VU needle, whose own mass and damping do the rest.
     private const double FastLoudnessSeconds = 0.025;
     private double _fastLufsEnergy;
-    private double _lufsEnergyLeft;
-    private double _lufsEnergyRight;
-    private double _rmsEnergyLeft;
-    private double _rmsEnergyRight;
     // EBU R128 short-term loudness: mean K-weighted energy over a sliding 3 s window, kept as 30 blocks of 100 ms.
     private const int ShortTermBlocks = 30;
     private readonly double[] _shortTermBlockEnergy = new double[ShortTermBlocks];
@@ -2243,66 +2212,47 @@ internal sealed class AnalysisEngine
 
     private void PushLocked(ReadOnlySpan<float> samples, int channels, int sampleRate)
     {
+        if (_lufsFilterSampleRate != sampleRate)
+            ConfigureLufsFilters(sampleRate);
+        var frames = samples.Length / channels;
+        if (frames == 0) return;
+        var lufsBlockEnergy = 0.0;
+        for (var frame = 0; frame < frames; frame++)
         {
-            if (_lufsFilterSampleRate != sampleRate)
-                ConfigureLufsFilters(sampleRate);
-            if (samples.Length == 0) return;
-            var frames = samples.Length / channels;
-            if (frames == 0) return;
-            var blockEnergy = 0.0;
-            var lufsBlockEnergy = 0.0;
-            double lufsLeft = 0, lufsRight = 0, rmsLeft = 0, rmsRight = 0;
-            for (var frame = 0; frame < frames; frame++)
+            var left = samples[frame * channels];
+            var right = channels > 1 ? samples[frame * channels + 1] : left;
+            var weightedLeft = FilterLufsSample(left, 0);
+            var weightedRight = channels > 1 ? FilterLufsSample(right, 1) : 0;
+            var weightedEnergy = weightedLeft * weightedLeft + weightedRight * weightedRight;
+            lufsBlockEnergy += weightedEnergy;
+            _shortTermAccumulator += weightedEnergy;
+            if (++_shortTermAccumulatedFrames >= sampleRate / 10)
             {
-                var left = samples[frame * channels];
-                var right = channels > 1 ? samples[frame * channels + 1] : left;
-                var weightedLeft = FilterLufsSample(left, 0);
-                var weightedRight = channels > 1 ? FilterLufsSample(right, 1) : 0;
-                var weightedEnergy = weightedLeft * weightedLeft + weightedRight * weightedRight;
-                lufsBlockEnergy += weightedEnergy;
-                _shortTermAccumulator += weightedEnergy;
-                if (++_shortTermAccumulatedFrames >= sampleRate / 10)
-                {
-                    _shortTermBlockEnergy[_shortTermBlockWrite] = _shortTermAccumulator / _shortTermAccumulatedFrames;
-                    _shortTermBlockWrite = (_shortTermBlockWrite + 1) % ShortTermBlocks;
-                    _shortTermBlockCount = Math.Min(_shortTermBlockCount + 1, ShortTermBlocks);
-                    _shortTermAccumulator = 0;
-                    _shortTermAccumulatedFrames = 0;
-                }
-                lufsLeft += weightedLeft * weightedLeft;
-                lufsRight += channels > 1 ? weightedRight * weightedRight : weightedLeft * weightedLeft;
-                rmsLeft += left * left;
-                rmsRight += right * right;
-                _left[_writePosition] = left;
-                _right[_writePosition] = right;
-                _writePosition = (_writePosition + 1) % RingSize;
-                blockEnergy += (left * left + right * right) * 0.5;
-                _totalFrames++;
+                _shortTermBlockEnergy[_shortTermBlockWrite] = _shortTermAccumulator / _shortTermAccumulatedFrames;
+                _shortTermBlockWrite = (_shortTermBlockWrite + 1) % ShortTermBlocks;
+                _shortTermBlockCount = Math.Min(_shortTermBlockCount + 1, ShortTermBlocks);
+                _shortTermAccumulator = 0;
+                _shortTermAccumulatedFrames = 0;
             }
-            var smoothing = Math.Exp(-(double)frames / (sampleRate * LevelSmoothingSeconds));
-            _shortTermEnergy = smoothing * _shortTermEnergy + (1 - smoothing) * blockEnergy / frames;
-            _lufsEnergy = smoothing * _lufsEnergy + (1 - smoothing) * lufsBlockEnergy / frames;
-            var fastSmoothing = Math.Exp(-(double)frames / (sampleRate * FastLoudnessSeconds));
-            _fastLufsEnergy = fastSmoothing * _fastLufsEnergy + (1 - fastSmoothing) * lufsBlockEnergy / frames;
-            _lufsEnergyLeft = smoothing * _lufsEnergyLeft + (1 - smoothing) * lufsLeft / frames;
-            _lufsEnergyRight = smoothing * _lufsEnergyRight + (1 - smoothing) * lufsRight / frames;
-            _rmsEnergyLeft = smoothing * _rmsEnergyLeft + (1 - smoothing) * rmsLeft / frames;
-            _rmsEnergyRight = smoothing * _rmsEnergyRight + (1 - smoothing) * rmsRight / frames;
-            _generation++;
+            _left[_writePosition] = left;
+            _right[_writePosition] = right;
+            _writePosition = (_writePosition + 1) % RingSize;
         }
+        _totalFrames += frames;
+        var smoothing = Math.Exp(-(double)frames / (sampleRate * LevelSmoothingSeconds));
+        _lufsEnergy = smoothing * _lufsEnergy + (1 - smoothing) * lufsBlockEnergy / frames;
+        var fastSmoothing = Math.Exp(-(double)frames / (sampleRate * FastLoudnessSeconds));
+        _fastLufsEnergy = fastSmoothing * _fastLufsEnergy + (1 - fastSmoothing) * lufsBlockEnergy / frames;
+        _generation++;
     }
 
     public AnalysisSnapshot GetSnapshot()
     {
         long generation;
-        double cross = 0;
-        double leftEnergy = 0;
-        double rightEnergy = 0;
-        double shortTermEnergy;
-        double lufsEnergy;
-        double fastLufsEnergy;
-        double lufsEnergyLeft, lufsEnergyRight, rmsEnergyLeft, rmsEnergyRight, shortTermLufsEnergy;
+        double lufsEnergy, fastLufsEnergy, shortTermLufsEnergy;
         int sampleRate;
+        var left = _snapshot.Left;
+        var right = _snapshot.Right;
         lock (_gate)
         {
             if (_totalFrames == 0)
@@ -2313,56 +2263,36 @@ internal sealed class AnalysisEngine
             if (_snapshotGeneration == _generation) return _snapshot;
             _snapshotGeneration = _generation;
             generation = _generation;
-            shortTermEnergy = _shortTermEnergy;
             lufsEnergy = _lufsEnergy;
             fastLufsEnergy = _fastLufsEnergy;
-            lufsEnergyLeft = _lufsEnergyLeft;
-            lufsEnergyRight = _lufsEnergyRight;
-            rmsEnergyLeft = _rmsEnergyLeft;
-            rmsEnergyRight = _rmsEnergyRight;
             sampleRate = _lufsFilterSampleRate;
             shortTermLufsEnergy = 0;
             for (var i = 0; i < _shortTermBlockCount; i++)
                 shortTermLufsEnergy += _shortTermBlockEnergy[i];
             if (_shortTermBlockCount > 0) shortTermLufsEnergy /= _shortTermBlockCount;
+
+            // The newest FftSize frames of the ring, oldest first, right-aligned (zeros before them at start-up).
             var available = (int)Math.Min(FftSize, _totalFrames);
             var start = (_writePosition - available + RingSize) % RingSize;
-            Array.Clear(_analysisLeft);
-            Array.Clear(_analysisRight);
-            for (var i = 0; i < available; i++)
-            {
-                _analysisLeft[FftSize - available + i] = _left[(start + i) % RingSize];
-                _analysisRight[FftSize - available + i] = _right[(start + i) % RingSize];
-            }
+            var offset = FftSize - available;
+            Array.Clear(left, 0, offset);
+            Array.Clear(right, 0, offset);
+            var firstPart = Math.Min(available, RingSize - start);
+            Array.Copy(_left, start, left, offset, firstPart);
+            Array.Copy(_right, start, right, offset, firstPart);
+            Array.Copy(_left, 0, left, offset + firstPart, available - firstPart);
+            Array.Copy(_right, 0, right, offset + firstPart, available - firstPart);
         }
 
-        var left = _snapshot.Left;
-        var right = _snapshot.Right;
-        Array.Copy(_analysisLeft, left, FftSize);
-        Array.Copy(_analysisRight, right, FftSize);
         for (var i = 0; i < FftSize; i++)
-        {
-            var leftSample = left[i];
-            var rightSample = right[i];
-            cross += leftSample * rightSample;
-            leftEnergy += leftSample * leftSample;
-            rightEnergy += rightSample * rightSample;
-            _combined[i] = (leftSample + rightSample) * 0.5f;
-        }
-        var shortDb = ToDb(Math.Sqrt(shortTermEnergy));
+            _combined[i] = (left[i] + right[i]) * 0.5f;
         CalculateSpectrum(_combined, _fftReal, _fftImaginary, _snapshot.SpectrumDb);
         _snapshot.HasSignal = true;
         _snapshot.Generation = generation;
-        _snapshot.ShortTermDb = shortDb;
         _snapshot.MomentaryLufs = lufsEnergy > 1e-10 ? -0.691 + 10 * Math.Log10(lufsEnergy) : -100;
         _snapshot.FastLufs = fastLufsEnergy > 1e-10 ? -0.691 + 10 * Math.Log10(fastLufsEnergy) : -100;
-        _snapshot.LufsLeft = lufsEnergyLeft > 1e-10 ? -0.691 + 10 * Math.Log10(lufsEnergyLeft) : -100;
-        _snapshot.LufsRight = lufsEnergyRight > 1e-10 ? -0.691 + 10 * Math.Log10(lufsEnergyRight) : -100;
-        _snapshot.RmsLeftDb = ToDb(Math.Sqrt(rmsEnergyLeft));
-        _snapshot.RmsRightDb = ToDb(Math.Sqrt(rmsEnergyRight));
         _snapshot.SampleRate = sampleRate;
         _snapshot.ShortTermLufs = shortTermLufsEnergy > 1e-10 ? -0.691 + 10 * Math.Log10(shortTermLufsEnergy) : -100;
-        _snapshot.Correlation = leftEnergy * rightEnergy > 1e-14 ? Math.Clamp(cross / Math.Sqrt(leftEnergy * rightEnergy), -1, 1) : 0;
         return _snapshot;
     }
 
@@ -2379,13 +2309,8 @@ internal sealed class AnalysisEngine
             _generation++;
             _snapshotGeneration = -1;
             _snapshot.HasSignal = false;
-            _shortTermEnergy = 0;
             _lufsEnergy = 0;
             _fastLufsEnergy = 0;
-            _lufsEnergyLeft = 0;
-            _lufsEnergyRight = 0;
-            _rmsEnergyLeft = 0;
-            _rmsEnergyRight = 0;
             ClearShortTerm();
             Array.Clear(_lufsFilterState);
         }
@@ -3348,24 +3273,6 @@ internal sealed class MeterChart : Control
             (int)(r + (255 - r) * lift),
             (int)(g + (255 - g) * lift),
             (int)(b + (255 - b) * lift)).ToArgb();
-    }
-
-    private static int HsvToArgb(double hue, double saturation, double value)
-    {
-        var chroma = value * saturation;
-        var sector = hue / 60;
-        var x = chroma * (1 - Math.Abs(sector % 2 - 1));
-        var m = value - chroma;
-        var (r, g, b) = sector switch
-        {
-            < 1 => (chroma, x, 0d),
-            < 2 => (x, chroma, 0d),
-            < 3 => (0d, chroma, x),
-            < 4 => (0d, x, chroma),
-            < 5 => (x, 0d, chroma),
-            _ => (chroma, 0d, x),
-        };
-        return Color.FromArgb((int)((r + m) * 255), (int)((g + m) * 255), (int)((b + m) * 255)).ToArgb();
     }
 
     /// <summary>Spectrogram colour table (quiet to loud) from the active theme's colour ramp.</summary>
